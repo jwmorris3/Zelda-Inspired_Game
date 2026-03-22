@@ -1,0 +1,3230 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+<title>Zelda Adventure</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    background: #111;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 100vh;
+    font-family: 'Courier New', monospace;
+    color: #fff;
+  }
+  h1 {
+    color: #FFD700;
+    font-size: 2rem;
+    margin-bottom: 10px;
+    text-shadow: 2px 2px #000;
+    letter-spacing: 4px;
+  }
+  #hud {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    margin-bottom: 8px;
+    font-size: 1rem;
+    color: #FFD700;
+  }
+  .hearts { font-size: 1.4rem; letter-spacing: 2px; }
+  #roomLabel { color: #aaa; font-size: 0.85rem; }
+  canvas {
+    border: 3px solid #444;
+    background: #1a1a1a;
+    display: block;
+    image-rendering: pixelated;
+  }
+  /* Inventory bar */
+  #inventoryBar {
+    width: 640px;
+    display: flex;
+    align-items: center;
+    margin-top: 0;
+    background: #0e0e0e;
+    border: 2px solid #333;
+    border-top: none;
+    padding: 8px 14px;
+    gap: 0;
+  }
+  .inv-section { display: flex; flex-direction: column; align-items: center; }
+  .inv-section-title {
+    color: #555; font-size: 0.6rem; letter-spacing: 2px;
+    margin-bottom: 5px; text-transform: uppercase;
+  }
+  .inv-slots-row { display: flex; gap: 7px; }
+  .inv-divider { width: 1px; background: #2a2a2a; margin: 0 14px; align-self: stretch; }
+  .inv-slot {
+    width: 62px; height: 62px;
+    background: #111;
+    border: 2px solid #222;
+    border-radius: 6px;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    cursor: pointer; position: relative;
+    user-select: none;
+    transition: border-color 0.1s, background 0.1s;
+  }
+  .inv-slot.equipped-slot { background: #161616; border-color: #333; }
+  .inv-slot.has-item { border-color: #4a4a4a; }
+  .inv-slot.passive-item { border-color: #2a4a7a !important; }
+  .inv-slot.tier2 { border-color: #4488ff !important; }
+  .inv-slot.tier3 { border-color: #FFD700 !important; box-shadow: 0 0 6px rgba(255,215,0,0.4); }
+  @keyframes inv-pulse {
+    0%,100% { box-shadow: 0 0 10px 3px rgba(255,215,0,0.9), inset 0 0 8px rgba(255,215,0,0.3); }
+    50%      { box-shadow: 0 0 4px 1px rgba(255,215,0,0.3), inset 0 0 2px rgba(255,215,0,0.1); }
+  }
+  .inv-slot.selected {
+    border-color: #FFD700 !important;
+    background: #2e2400 !important;
+    animation: inv-pulse 0.6s ease-in-out infinite;
+  }
+  .inv-slot:hover { border-color: #777; }
+  @keyframes slotConsume { 0%{background:#44ff88;box-shadow:0 0 14px #44ff88;} 60%{background:#1a3a1a;box-shadow:0 0 4px #44ff88;} 100%{background:transparent;box-shadow:none;} }
+  .inv-slot.consumed { animation: slotConsume 0.6s ease-out forwards; }
+  /* keyboard cursor — white outline shows which slot arrow keys are on */
+  .inv-slot.cursor { outline: 3px solid #fff; outline-offset: 2px; }
+  .inv-slot.cursor.selected { outline-color: #FFD700; }
+  #swapHint {
+    display: none;
+    text-align: center;
+    color: #FFD700;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    padding: 5px 0 2px;
+    width: 640px;
+    background: #0a0a0a;
+    border: 1px solid #333;
+    border-top: none;
+    animation: inv-pulse 0.6s ease-in-out infinite;
+  }
+  .inv-key-label {
+    position: absolute; top: 3px; left: 0; right: 0;
+    text-align: center; font-size: 0.56rem; color: #555;
+    pointer-events: none;
+  }
+  .inv-slot.selected .inv-key-label { color: #aaa; }
+  .inv-icon { font-size: 1.55rem; line-height: 1; margin-top: 10px; }
+  .inv-name { font-size: 0.5rem; color: #666; margin-top: 1px; }
+  .inv-count { position: absolute; bottom: 3px; right: 5px; font-size: 0.6rem; color: #FFD700; }
+
+  #controls {
+    margin-top: 8px;
+    color: #555;
+    font-size: 0.7rem;
+    text-align: center;
+  }
+  #gameOverScreen, #winScreen, #homeScreen, #enemyIndex {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.92);
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 16px;
+    z-index: 10;
+  }
+  #gameOverScreen h2 { color: #e33; font-size: 2.5rem; }
+  #winScreen h2 { color: #FFD700; font-size: 2.5rem; }
+  button {
+    padding: 10px 28px;
+    background: #FFD700;
+    border: none;
+    border-radius: 6px;
+    font-size: 1rem;
+    font-family: 'Courier New', monospace;
+    font-weight: bold;
+    cursor: pointer;
+    color: #111;
+  }
+  button:hover { background: #fff; }
+
+  /* Home screen */
+  #homeScreen { gap: 20px; }
+  #homeScreen h2 { color: #FFD700; font-size: 3rem; letter-spacing: 6px; text-shadow: 0 0 20px #FFD700; }
+  #homeScreen p { color: #aaa; font-size: 0.9rem; }
+  .home-buttons { display: flex; gap: 14px; flex-wrap: wrap; justify-content: center; }
+  .char-select { display:flex; align-items:center; gap:14px; background:rgba(255,255,255,0.06); border:1px solid #444; border-radius:10px; padding:10px 18px; }
+  .char-select span { color:#ccc; font-size:0.85rem; }
+  .char-select strong { color:#FFD700; font-size:1rem; min-width:50px; text-align:center; }
+  #charToggleBtn { padding:6px 16px; font-size:0.8rem; }
+
+  /* Enemy index */
+  #enemyIndex { gap: 24px; }
+  #enemyIndex h2 { color: #FFD700; font-size: 2rem; letter-spacing: 3px; }
+  .enemy-grid { display: flex; gap: 24px; flex-wrap: wrap; justify-content: center; }
+  .enemy-card {
+    background: #1a1a1a;
+    border: 2px solid #444;
+    border-radius: 8px;
+    padding: 18px 22px;
+    width: 170px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .enemy-card canvas { margin: 0 auto; border: none; background: transparent; }
+  .enemy-card h3 { color: #FFD700; font-size: 1rem; }
+  .enemy-card .stat { color: #aaa; font-size: 0.78rem; line-height: 1.6; }
+  .enemy-card .lore { color: #888; font-size: 0.72rem; font-style: italic; margin-top: 4px; }
+
+  /* ─── Touch Controls ──────────────────────────────────── */
+  #touchControls {
+    display: none;
+    width: 100%; max-width: 640px;
+    padding: 12px 16px;
+    justify-content: space-between;
+    align-items: center;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  #dpad {
+    width: 130px; height: 130px;
+    position: relative;
+    touch-action: none;
+  }
+  .dpad-btn {
+    position: absolute;
+    width: 42px; height: 42px;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 1.2rem; color: #fff;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .dpad-btn.active { background: rgba(255,215,0,0.35); border-color: #FFD700; }
+  #dpadUp    { top: 0;   left: 44px; }
+  #dpadDown  { bottom: 0; left: 44px; }
+  #dpadLeft  { top: 44px; left: 0; }
+  #dpadRight { top: 44px; right: 0; }
+  #dpadCenter {
+    position: absolute; top: 44px; left: 44px;
+    width: 42px; height: 42px;
+    background: rgba(255,255,255,0.06);
+    border-radius: 50%;
+  }
+  .action-btns {
+    display: grid;
+    grid-template-columns: 56px 56px;
+    gap: 10px;
+  }
+  .action-btn {
+    width: 56px; height: 56px;
+    background: rgba(255,255,255,0.12);
+    border: 2px solid rgba(255,255,255,0.25);
+    border-radius: 50%;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    font-size: 1.3rem; color: #fff;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+  }
+  .action-btn .btn-label {
+    font-size: 0.45rem; color: #aaa; margin-top: 1px;
+    letter-spacing: 1px; text-transform: uppercase;
+  }
+  .action-btn.active { background: rgba(255,215,0,0.35); border-color: #FFD700; }
+
+  /* Show touch controls on touch devices, hide keyboard hints */
+  @media (pointer: coarse) {
+    #touchControls { display: flex; }
+    #controls { display: none; }
+  }
+
+  /* Scale game down on narrow screens */
+  #gameWrap {
+    display: flex; flex-direction: column; align-items: center;
+    transform-origin: top center;
+  }
+  @media (max-width: 660px) {
+    #gameWrap { transform: scale(calc(100vw / 660)); }
+    body { justify-content: flex-start; padding-top: 8px; }
+    h1 { font-size: 1.3rem; margin-bottom: 4px; }
+    #hud { font-size: 0.8rem; gap: 10px; }
+  }
+</style>
+</head>
+<body>
+<h1>⚔️ ZELDA ADVENTURE</h1>
+<div id="hud">
+  <span>❤️ <span class="hearts" id="heartsDisplay"></span></span>
+  <span id="roomLabel">Room 1/8</span>
+</div>
+<div id="gameWrap">
+<canvas id="gameCanvas" width="640" height="480"></canvas>
+<div id="inventoryBar">
+  <div class="inv-section">
+    <div class="inv-section-title">Equipped</div>
+    <div class="inv-slots-row">
+      <div class="inv-slot equipped-slot" id="invSlot0" onclick="invClick(0)">
+        <span class="inv-key-label">Z / Space</span>
+        <span class="inv-icon" id="invIcon0"></span>
+        <span class="inv-name" id="invName0"></span>
+        <span class="inv-count" id="invCount0"></span>
+      </div>
+      <div class="inv-slot equipped-slot" id="invSlot1" onclick="invClick(1)">
+        <span class="inv-key-label">X</span>
+        <span class="inv-icon" id="invIcon1"></span>
+        <span class="inv-name" id="invName1"></span>
+        <span class="inv-count" id="invCount1"></span>
+      </div>
+    </div>
+  </div>
+  <div class="inv-divider"></div>
+  <div class="inv-section">
+    <div class="inv-section-title">Bag</div>
+    <div class="inv-slots-row">
+      <div class="inv-slot" id="invSlot2" onclick="invClick(2)">
+        <span class="inv-icon" id="invIcon2"></span>
+        <span class="inv-name" id="invName2"></span>
+        <span class="inv-count" id="invCount2"></span>
+      </div>
+      <div class="inv-slot" id="invSlot3" onclick="invClick(3)">
+        <span class="inv-icon" id="invIcon3"></span>
+        <span class="inv-name" id="invName3"></span>
+        <span class="inv-count" id="invCount3"></span>
+      </div>
+      <div class="inv-slot" id="invSlot4" onclick="invClick(4)">
+        <span class="inv-icon" id="invIcon4"></span>
+        <span class="inv-name" id="invName4"></span>
+        <span class="inv-count" id="invCount4"></span>
+      </div>
+      <div class="inv-slot" id="invSlot5" onclick="invClick(5)">
+        <span class="inv-icon" id="invIcon5"></span>
+        <span class="inv-name" id="invName5"></span>
+        <span class="inv-count" id="invCount5"></span>
+      </div>
+      <div class="inv-slot" id="invSlot6" onclick="invClick(6)">
+        <span class="inv-icon" id="invIcon6"></span>
+        <span class="inv-name" id="invName6"></span>
+        <span class="inv-count" id="invCount6"></span>
+      </div>
+      <div class="inv-slot" id="invSlot7" onclick="invClick(7)">
+        <span class="inv-icon" id="invIcon7"></span>
+        <span class="inv-name" id="invName7"></span>
+        <span class="inv-count" id="invCount7"></span>
+      </div>
+    </div>
+  </div>
+</div>
+<div id="swapHint">✦ SLOT SELECTED — press ↑ again (or click another slot) to swap &nbsp;|&nbsp; ↓ or click same slot to cancel ✦</div>
+<div id="controls">
+  WASD — Move &nbsp;|&nbsp; Z/Space — use slot 1 &nbsp;|&nbsp; X — use slot 2 &nbsp;|&nbsp; ← → move inventory cursor &nbsp;|&nbsp; ↑ select/swap &nbsp;|&nbsp; ↓ cancel &nbsp;|&nbsp; E — Full Inventory &nbsp;|&nbsp; C — Drop Item
+</div>
+</div><!-- /gameWrap -->
+
+<!-- Touch Controls (visible on touch devices only) -->
+<div id="touchControls">
+  <div id="dpad">
+    <div id="dpadCenter"></div>
+    <div class="dpad-btn" id="dpadUp">▲</div>
+    <div class="dpad-btn" id="dpadDown">▼</div>
+    <div class="dpad-btn" id="dpadLeft">◀</div>
+    <div class="dpad-btn" id="dpadRight">▶</div>
+  </div>
+  <div class="action-btns">
+    <div class="action-btn" id="btnAttack">⚔️<span class="btn-label">ATK</span></div>
+    <div class="action-btn" id="btnSlot2">🏹<span class="btn-label">SLT2</span></div>
+    <div class="action-btn" id="btnInv">📦<span class="btn-label">INV</span></div>
+    <div class="action-btn" id="btnDrop">🗑️<span class="btn-label">DROP</span></div>
+  </div>
+</div>
+
+<!-- Home Screen -->
+<div id="homeScreen">
+  <h2>⚔️ ZELDA ADVENTURE</h2>
+  <p>A dark power has stolen the Triforce. Only you can recover it.</p>
+  <div class="char-select">
+    <span>Character:</span>
+    <canvas id="charPreview" width="32" height="40" style="image-rendering:pixelated;"></canvas>
+    <strong id="charName">Link</strong>
+    <button id="charToggleBtn" onclick="toggleCharacter()">Switch</button>
+  </div>
+  <div class="home-buttons">
+    <button onclick="startGame()">▶ Start Game</button>
+    <button onclick="showEnemyIndex()">📖 Enemy Index</button>
+  </div>
+  <p style="color:#555; font-size:0.72rem; margin-top:8px;">WASD / Arrows — Move &nbsp;|&nbsp; Space / Z — Attack &nbsp;|&nbsp; E — Inventory &nbsp;|&nbsp; C — Drop</p>
+</div>
+
+<!-- Enemy Index -->
+<div id="enemyIndex">
+  <h2>📖 ENEMY INDEX</h2>
+  <div class="enemy-grid">
+    <div class="enemy-card">
+      <canvas id="slimePreview" width="48" height="48"></canvas>
+      <h3>Slime</h3>
+      <div class="stat">HP: ❤️❤️<br>Speed: Slow<br>Drops: Rupees, Potion</div>
+      <div class="lore">"A gelatinous blob that wanders aimlessly. Don't let its dopey eyes fool you."</div>
+    </div>
+    <div class="enemy-card">
+      <canvas id="guardPreview" width="48" height="48"></canvas>
+      <h3>Guard</h3>
+      <div class="stat">HP: ❤️❤️❤️<br>Speed: Medium<br>Drops: Rupees, Bombs, Iron Sword</div>
+      <div class="lore">"An armored soldier loyal to the dark power. Attacks with sword and bow."</div>
+    </div>
+    <div class="enemy-card">
+      <canvas id="hopperPreview" width="48" height="48"></canvas>
+      <h3>Hopper</h3>
+      <div class="stat">HP: ❤️❤️<br>Speed: Jumpy<br>Drops: Rupees, Potion</div>
+      <div class="lore">"A cursed frog that leaps at intruders. Hard to predict, harder to hit mid-air."</div>
+    </div>
+    <div class="enemy-card">
+      <canvas id="bossPreview" width="64" height="64"></canvas>
+      <h3>Dark Dragon</h3>
+      <div class="stat">HP: ❤️❤️❤️❤️❤️❤️❤️❤️<br>Speed: Fast<br>Drops: Master Sword</div>
+      <div class="lore">"The guardian of the Triforce Chamber. Ancient, powerful, and very angry."</div>
+    </div>
+    <div class="enemy-card">
+      <canvas id="shadowDragonPreview" width="64" height="64"></canvas>
+      <h3>Shadow Dragon</h3>
+      <div class="stat">HP: ❤️×15<br>Speed: Very Fast<br>Drops: Master Sword</div>
+      <div class="lore">"A dragon consumed by shadow. Far more dangerous than its fiery kin."</div>
+    </div>
+  </div>
+  <button onclick="closeEnemyIndex()">← Back</button>
+</div>
+
+<div id="gameOverScreen">
+  <h2>💀 GAME OVER</h2>
+  <p style="color:#ccc">You have fallen...</p>
+  <div style="display:flex;gap:12px">
+    <button onclick="restartGame()">Try Again</button>
+    <button onclick="goHome()">Main Menu</button>
+  </div>
+</div>
+<div id="winScreen">
+  <h2>🏆 YOU WIN!</h2>
+  <p style="color:#ccc">You recovered the Triforce!</p>
+  <div style="display:flex;gap:12px">
+    <button onclick="restartGame()">Play Again</button>
+    <button onclick="goHome()">Main Menu</button>
+  </div>
+</div>
+
+<script>
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Cache inventory slot DOM references once
+const INV_ELS = Array.from({length: 8}, (_, i) => ({
+  slot:  document.getElementById(`invSlot${i}`),
+  icon:  document.getElementById(`invIcon${i}`),
+  name:  document.getElementById(`invName${i}`),
+  count: document.getElementById(`invCount${i}`),
+}));
+
+// ─── Character selection ──────────────────────────────────────
+let selectedCharacter = 'link';
+function toggleCharacter() {
+  selectedCharacter = selectedCharacter === 'link' ? 'zelda' : 'link';
+  document.getElementById('charName').textContent = selectedCharacter === 'link' ? 'Link' : 'Zelda';
+  drawCharPreview();
+}
+function drawCharPreview() {
+  const pc = document.getElementById('charPreview');
+  const cx = pc.getContext('2d');
+  cx.clearRect(0, 0, pc.width, pc.height);
+  const x = 8, y = 4, w = 16, h = 20;
+  cx.fillStyle = 'rgba(0,0,0,0.2)';
+  cx.beginPath(); cx.ellipse(x+w/2, y+h+3, w/2, 4, 0, 0, Math.PI*2); cx.fill();
+  if (selectedCharacter === 'link') {
+    cx.fillStyle = '#22bb22'; cx.fillRect(x, y, w, h);
+    cx.fillStyle = '#55ee55'; cx.fillRect(x+2, y+2, w-4, 5);
+    cx.fillStyle = '#22bb22';
+    cx.beginPath(); cx.moveTo(x+1,y); cx.lineTo(x+w/2,y-8); cx.lineTo(x+w-1,y); cx.closePath(); cx.fill();
+    cx.fillStyle = '#f5deb3'; cx.fillRect(x+4, y+2, 8, 8);
+    cx.fillStyle = '#000'; cx.fillRect(x+5, y+4, 2, 2); cx.fillRect(x+9, y+4, 2, 2);
+  } else {
+    cx.fillStyle = '#e060a0'; cx.fillRect(x, y, w, h);
+    cx.fillStyle = '#f080c0'; cx.fillRect(x+2, y+2, w-4, 5);
+    cx.fillStyle = '#e060a0'; cx.fillRect(x-2, y+h-6, w+4, 6);
+    cx.fillStyle = '#f5deb3'; cx.fillRect(x+4, y+2, 8, 8);
+    cx.fillStyle = '#000'; cx.fillRect(x+5, y+4, 2, 2); cx.fillRect(x+9, y+4, 2, 2);
+    cx.fillStyle = '#c8a020';
+    cx.fillRect(x, y+2, 3, 14);
+    cx.fillRect(x+w-3, y+2, 3, 14);
+    cx.fillRect(x+2, y-2, w-4, 5);
+    cx.fillStyle = '#FFD700';
+    cx.fillRect(x+3, y-4, w-6, 3);
+    cx.fillRect(x+4, y-7, 2, 4); cx.fillRect(x+w/2-1, y-8, 3, 5); cx.fillRect(x+w-6, y-7, 2, 4);
+  }
+}
+
+// ─── Constants ───────────────────────────────────────────────
+const TILE = 32;
+const COLS = 20, ROWS = 15;
+const W = COLS * TILE, H = ROWS * TILE;
+
+// Tile types
+const T_GRASS    = 0;
+const T_WALL     = 1;
+const T_WATER    = 2;
+const T_PATH     = 3;
+const T_DOOR_C   = 4;
+const T_DOOR_O   = 5;
+const T_TRIFORCE = 6;
+const T_SWORD    = 7;
+const T_BOW      = 8;
+const T_DOOR_E   = 9;
+const T_DOOR_W   = 10;
+const T_SHIELD   = 11;
+const T_RESPAWN  = 12;
+const T_BOMB_ITEM= 13;
+const T_POTION   = 14;
+const T_HIDDEN_WALL=15;
+
+// ─── PHASE 1: Item Tier System ──────────────────────────────
+const ITEM_DEFS = {
+  'sword_wood':   { name: 'Wood Sword',   icon: '⚔️', tier: 1, category: 'weapon', dmg: 1, attackDur: 12 },
+  'sword_iron':   { name: 'Iron Sword',   icon: '⚔️', tier: 2, category: 'weapon', dmg: 2, attackDur: 10 },
+  'sword_master': { name: 'Master Sword', icon: '⚔️', tier: 3, category: 'weapon', dmg: 3, attackDur: 8 },
+  'bow_wood':     { name: 'Wood Bow',     icon: '🏹', tier: 1, category: 'weapon', cooldown: 45, arrowDmg: 1 },
+  'bow_long':     { name: 'Long Bow',     icon: '🏹', tier: 2, category: 'weapon', cooldown: 30, arrowDmg: 1 },
+  'bow_magic':    { name: 'Magic Bow',    icon: '🏹', tier: 3, category: 'weapon', cooldown: 25, arrowDmg: 2 },
+  'shield_wood':  { name: 'Wood Shield',  icon: '🛡️', tier: 1, category: 'passive', durability: 5 },
+  'shield_iron':  { name: 'Iron Shield',  icon: '🛡️', tier: 2, category: 'passive', durability: 10 },
+  'shield_magic': { name: 'Magic Shield', icon: '🛡️', tier: 3, category: 'passive', durability: 20 },
+  'respawn':      { name: 'Respawn',      icon: '✨', tier: 0, category: 'passive' },
+  'bomb':         { name: 'Bomb',         icon: '💣', tier: 0, category: 'consumable', stackable: true },
+  'potion':       { name: 'Potion',       icon: '💊', tier: 0, category: 'consumable' },
+  'rupee':        { name: 'Rupee',        icon: '💎', tier: 0, category: 'currency', stackable: true },
+};
+
+function isSword(t) { return t?.startsWith('sword'); }
+function isBow(t) { return t?.startsWith('bow'); }
+function isShield(t) { return t?.startsWith('shield'); }
+function isPassiveType(t) { return isShield(t) || t === 'respawn'; }
+
+// ─── Color Palette ────────────────────────────────────────────
+const TILE_COLORS = {
+  [T_GRASS]:  ['#2d6a2d','#256025','#336633'],
+  [T_WALL]:   ['#555','#666','#444'],
+  [T_WATER]:  ['#1a5fa8','#1a6db8','#1a4f98'],
+  [T_PATH]:   ['#b89a50','#c8a840','#a88230'],
+  [T_DOOR_C]: ['#8B4513','#7a3b10'],
+  [T_DOOR_O]: ['#2d6a2d','#256025'],
+  [T_TRIFORCE]:['#FFD700'],
+  [T_SWORD]:  ['#b89a50','#c8a840','#a88230'],
+  [T_BOW]:    ['#b89a50','#c8a840','#a88230'],
+  [T_DOOR_E]: ['#6a3a1a','#7a4a2a'],
+  [T_DOOR_W]: ['#6a3a1a','#7a4a2a'],
+  [T_SHIELD]: ['#b89a50','#c8a840'],
+  [T_RESPAWN]:['#b89a50','#c8a840'],
+  [T_BOMB_ITEM]:['#b89a50','#c8a840'],
+  [T_POTION]: ['#b89a50','#c8a840'],
+  [T_HIDDEN_WALL]:['#555','#666','#444'],
+};
+
+// ─── Room Definitions ─────────────────────────────────────────
+const ROOM_LAYOUTS = [
+  // Room 0: The Armoury
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,7,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,3,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,8,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,3,3,3,3,3,3,3,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 1: Forest clearing (east door at col 19 rows 6-7)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
+    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+    [1,0,0,0,0,0,2,2,2,0,0,2,2,0,0,0,0,0,0,1],
+    [1,0,0,0,0,2,2,2,2,2,2,2,2,2,0,0,0,0,0,1],
+    [1,0,0,0,0,2,2,0,0,0,0,0,2,2,0,0,0,0,0,9],
+    [1,0,0,0,0,0,2,0,0,0,0,0,2,0,0,0,0,0,0,9],
+    [1,0,0,0,0,0,2,2,2,0,0,2,2,0,0,0,0,0,0,1],
+    [1,0,0,0,0,2,2,2,2,2,2,2,2,2,0,0,0,0,0,1],
+    [1,0,0,0,0,0,2,2,2,0,0,2,2,0,0,0,0,0,0,1],
+    [1,0,0,1,0,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+    [1,0,0,1,1,0,0,0,0,0,0,0,0,0,1,1,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 2: Dungeon entrance (east door at col 19 rows 6-7)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,1,1,3,3,3,3,3,3,3,3,3,3,3,3,1,1,3,1],
+    [1,3,1,0,0,3,3,3,3,3,3,3,3,3,0,0,1,3,3,1],
+    [1,3,3,0,0,3,3,1,1,1,1,1,1,3,0,0,3,3,3,1],
+    [1,3,3,3,3,3,3,1,0,0,0,0,1,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,1,0,0,0,0,1,3,3,3,3,3,3,9],
+    [1,3,3,3,3,3,3,1,0,0,0,0,1,3,3,3,3,3,3,9],
+    [1,3,3,3,3,3,3,1,0,0,0,0,1,3,3,3,3,3,3,1],
+    [1,3,3,0,0,3,3,1,1,1,1,1,1,3,0,0,3,3,3,1],
+    [1,3,1,0,0,3,3,3,3,3,3,3,3,3,0,0,1,3,3,1],
+    [1,3,1,1,3,3,3,3,3,3,3,3,3,3,3,3,1,1,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 3: Cave (east door, hidden walls at row 12 cols 14-16)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,1,0,0,0,0,0,0,0,0,0,1,1,1,0,0,1],
+    [1,0,1,0,1,0,0,0,2,2,2,2,0,0,1,0,1,0,0,1],
+    [1,0,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,1],
+    [1,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,9],
+    [1,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,9],
+    [1,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,1],
+    [1,0,0,0,0,0,2,2,0,0,0,0,2,2,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,2,2,2,2,2,2,0,0,0,0,0,0,1],
+    [1,0,1,0,1,0,0,0,2,2,2,2,0,0,1,0,1,0,0,1],
+    [1,0,1,1,1,0,0,0,0,0,0,0,0,0,15,15,15,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 4: Boss room (north door opens to room 5 after boss dies)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,1,1,1,1,3,3,3,3,3,3,3,1,1,1,1,3,3,1],
+    [1,3,1,0,0,1,3,3,3,3,3,3,3,1,0,0,1,3,3,1],
+    [1,3,1,0,0,1,3,3,3,3,3,3,3,1,0,0,1,3,3,1],
+    [1,3,1,1,1,1,3,3,3,3,3,3,3,1,1,1,1,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,1,1,1,1,3,3,3,3,3,3,3,1,1,1,1,3,3,1],
+    [1,3,1,0,0,1,3,3,3,3,3,3,3,1,0,0,1,3,3,1],
+    [1,3,1,0,0,1,3,3,3,3,3,3,3,1,0,0,1,3,3,1],
+    [1,3,1,1,1,1,3,3,3,3,3,3,3,1,1,1,1,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 5: Dark Forest (harder Room 1)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,1,0,0,0,0,0,0,0,0,0,1,0,0,0,0,1],
+    [1,0,1,0,1,0,0,2,2,0,0,2,2,0,0,1,0,1,0,1],
+    [1,0,1,0,0,0,2,2,2,2,2,2,2,2,0,0,0,1,0,1],
+    [1,0,0,0,0,2,2,0,0,0,0,0,0,2,2,0,0,0,0,1],
+    [1,1,0,0,0,2,0,0,0,0,0,0,0,0,2,0,0,0,1,1],
+    [1,0,0,0,0,2,0,0,0,0,0,0,0,0,2,0,0,0,0,1],
+    [1,0,0,0,0,0,2,0,0,0,0,0,0,2,0,0,0,0,0,1],
+    [1,1,0,0,0,2,0,0,0,0,0,0,0,0,2,0,0,0,1,1],
+    [1,0,0,0,0,2,2,0,0,0,0,0,0,2,2,0,0,0,0,1],
+    [1,0,1,0,0,0,2,2,2,0,0,2,2,2,0,0,0,1,0,1],
+    [1,0,1,0,0,0,0,2,2,2,2,2,2,0,0,0,0,1,0,1],
+    [1,0,0,0,1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 6: Fortress Gate (harder Room 2)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,3,3,3,1,3,3,3,3,3,3,3,3,3,3,1,3,3,3,1],
+    [1,3,1,3,1,3,3,1,1,3,3,1,1,3,3,1,3,1,3,1],
+    [1,3,3,3,3,3,3,1,3,3,3,3,1,3,3,3,3,3,3,1],
+    [1,1,1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1],
+    [1,3,3,3,3,1,3,3,3,3,3,3,3,3,1,3,3,3,3,1],
+    [1,3,3,3,3,1,3,3,3,3,3,3,3,3,1,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,1,3,3,3,3,3,3,3,3,1,3,3,3,3,1],
+    [1,3,3,3,3,1,3,3,3,3,3,3,3,3,1,3,3,3,3,1],
+    [1,1,1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1,1,1],
+    [1,3,3,3,3,3,3,1,3,3,3,3,1,3,3,3,3,3,3,1],
+    [1,3,1,3,3,3,3,1,1,3,3,1,1,3,3,3,3,1,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 7: Cursed Caverns (harder Room 3)
+  [
+    [1,1,1,1,1,1,1,1,1,4,4,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,0,1,1,0,0,1,0,0,2,2,0,0,1,0,0,1,1,0,1],
+    [1,0,1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,0,1],
+    [1,0,0,0,0,1,0,2,2,0,0,2,2,0,1,0,0,0,0,1],
+    [1,0,0,1,0,0,0,2,0,0,0,0,2,0,0,0,1,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1,1],
+    [1,0,0,1,0,0,0,2,0,0,0,0,2,0,0,0,1,0,0,1],
+    [1,0,0,0,0,1,0,2,2,0,0,2,2,0,1,0,0,0,0,1],
+    [1,0,1,0,0,0,0,0,2,2,2,2,0,0,0,0,0,1,0,1],
+    [1,0,1,1,0,0,1,0,0,2,2,0,0,1,0,0,1,1,0,1],
+    [1,0,0,0,0,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Room 8: Dragon's Throne (harder boss room)
+  [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,2,2,3,3,3,1,1,3,3,1,1,3,3,3,2,2,3,1],
+    [1,3,2,2,3,3,3,1,3,3,3,3,1,3,3,3,2,2,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,1,3,3,3,3,3,3,3,3,3,3,1,3,3,3,1],
+    [1,3,3,3,1,3,3,3,3,3,3,3,3,3,3,1,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,1,3,3,3,3,3,3,3,3,3,3,1,3,3,3,1],
+    [1,3,3,3,1,3,3,3,3,3,3,3,3,3,3,1,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,2,2,3,3,3,1,3,3,3,3,1,3,3,3,2,2,3,1],
+    [1,3,2,2,3,3,3,1,1,3,3,1,1,3,3,3,2,2,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,1,1,1,1,1,1,1,1,5,5,1,1,1,1,1,1,1,1,1],
+  ],
+  // Side Room 9 (index 9): Shield room (from Room 1 east door)
+  [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,1],
+    [1,0,0,1,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,1],
+    [1,0,0,1,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,1],
+    [10,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [10,0,0,0,0,0,0,0,11,0,0,14,0,0,0,0,0,0,0,1],
+    [1,0,0,1,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,1],
+    [1,0,0,1,0,1,0,0,0,0,0,0,0,1,0,1,0,0,0,1],
+    [1,0,0,1,1,1,0,0,0,0,0,0,0,1,1,1,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  // Side Room 10 (index 10): Respawn + Potion room (from Room 2 east door)
+  [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,1,1,3,3,3,3,3,3,3,3,3,3,3,3,1,1,3,1],
+    [1,3,1,0,0,3,3,3,3,3,3,3,3,3,0,0,1,3,3,1],
+    [1,3,3,0,0,3,3,3,3,3,3,3,3,3,0,0,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [10,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [10,3,3,3,3,3,3,3,12,3,3,14,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,0,0,3,3,3,3,3,3,3,3,3,0,0,3,3,3,1],
+    [1,3,1,0,0,3,3,3,3,3,3,3,3,3,0,0,1,3,3,1],
+    [1,3,1,1,3,3,3,3,3,3,3,3,3,3,3,3,1,1,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,3,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+  // Side Room 11 (index 11): Bomb room (from Room 3 east door)
+  [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1],
+    [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,1,1,1,0,0,0,0,1,1,1,0,0,0,0,1],
+    [10,0,0,0,0,1,0,1,0,0,0,0,1,0,1,0,0,0,0,1],
+    [10,0,0,0,0,1,1,1,13,0,0,12,1,1,1,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,1,0,0,0,0,0,0,0,0,0,0,0,0,0,1,0,0,1],
+    [1,0,1,1,0,0,0,0,0,0,0,0,0,0,0,1,1,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+  ],
+];
+
+const ROOM_ENEMIES = [
+  // room 0 — no enemies
+  [],
+  // room 1
+  [
+    {x:160,y:128,type:'slime'},
+    {x:480,y:288,type:'slime'},
+    {x:320,y:352,type:'slime'},
+  ],
+  // room 2
+  [
+    {x:128,y:224,type:'slime'},
+    {x:480,y:224,type:'slime'},
+    {x:160,y:352,type:'guard'},
+    {x:448,y:352,type:'guard'},
+  ],
+  // room 3
+  [
+    {x:96, y:160,type:'guard'},
+    {x:512,y:160,type:'guard'},
+    {x:96, y:352,type:'guard'},
+    {x:448,y:416,type:'guard'},
+    {x:320,y:416,type:'slime'},
+  ],
+  // room 4 (boss)
+  [
+    {x:320,y:224,type:'boss'},
+  ],
+  // room 5: Dark Forest
+  [
+    {x:128,y:128,type:'slime'},{x:480,y:128,type:'slime'},
+    {x:96,y:320,type:'slime'},{x:512,y:320,type:'slime'},
+    {x:320,y:256,type:'slime'},
+    {x:192,y:384,type:'hopper'},{x:416,y:384,type:'hopper'},
+  ],
+  // room 6: Fortress Gate
+  [
+    {x:128,y:160,type:'guard'},{x:480,y:160,type:'guard'},
+    {x:128,y:352,type:'guard'},{x:480,y:352,type:'guard'},
+    {x:256,y:256,type:'slime'},{x:384,y:256,type:'slime'},
+    {x:320,y:384,type:'slime'},
+  ],
+  // room 7: Cursed Caverns
+  [
+    {x:96,y:128,type:'guard'},{x:512,y:128,type:'guard'},
+    {x:96,y:384,type:'guard'},{x:512,y:384,type:'guard'},
+    {x:256,y:192,type:'guard'},{x:384,y:320,type:'guard'},
+    {x:192,y:288,type:'hopper'},{x:416,y:192,type:'hopper'},
+    {x:320,y:128,type:'slime'},{x:320,y:384,type:'slime'},
+  ],
+  // room 8: Dragon's Throne (shadow dragon)
+  [
+    {x:320,y:224,type:'shadow_dragon'},
+  ],
+];
+
+const ROOM_RUPEES = [
+  [], // room 0
+  [{x:96,y:96},{x:512,y:96},{x:96,y:384},{x:512,y:384}],
+  [{x:160,y:160},{x:448,y:160},{x:160,y:320},{x:448,y:320}],
+  [{x:128,y:128},{x:480,y:128},{x:304,y:416}],
+  [{x:96,y:240},{x:512,y:240}],
+  [{x:64,y:64},{x:576,y:64},{x:64,y:416},{x:576,y:416},{x:320,y:320}],
+  [{x:160,y:96},{x:480,y:96},{x:320,y:192},{x:320,y:384}],
+  [{x:96,y:64},{x:544,y:64},{x:96,y:416},{x:544,y:416}],
+  [{x:96,y:192},{x:544,y:192},{x:96,y:320},{x:544,y:320}],
+];
+
+// ─── PHASE 3: Drop Tables ────────────────────────────────────
+const DROP_TABLES = {
+  slime:  [{ type: 'rupee', count: 1, chance: 0.5 }, { type: 'potion', chance: 0.1 }],
+  guard:  [{ type: 'rupee', count: 2, chance: 0.7 }, { type: 'bomb', count: 1, chance: 0.2 }, { type: 'sword_iron', chance: 0.05 }],
+  boss:   [{ type: 'sword_master', chance: 1.0 }],
+  hopper: [{ type: 'rupee', count: 1, chance: 0.6 }, { type: 'potion', chance: 0.15 }],
+  shadow_dragon: [{ type: 'sword_master', chance: 1.0 }],
+};
+
+function rollDrops(e) {
+  const table = DROP_TABLES[e.type];
+  if (!table) return;
+  for (const drop of table) {
+    if (Math.random() < drop.chance) {
+      state.groundItems.push({
+        x: e.x + e.w/2, y: e.y + e.h/2,
+        type: drop.type,
+        count: drop.count || 1,
+        roomIdx: state.room,
+        lifetime: 3600, // 60 seconds
+      });
+    }
+  }
+}
+
+// ─── Game State ───────────────────────────────────────────────
+let state;
+
+const TOTAL_ROOMS = 9; // rooms 0-8 main progression (side rooms are 9,10,11)
+const SIDE_ROOM_MAP = { 1: 9, 2: 10, 3: 11 };
+
+function createState() {
+  const st = {
+    room: 0,
+    player: {
+      x: 304, y: 416,
+      vx: 0, vy: 0,
+      w: 24, h: 24,
+      hp: 6, maxHp: 6,
+      speed: 3,
+      dir: 'down',
+      attacking: false,
+      attackTimer: 0,
+      attackDur: 12,
+      invincible: 0,
+      weapon: null,
+      bowCooldown: 0,
+      hasShield: false,
+      hasRespawn: false,
+      tempHp: 0,
+      jumpActive: false, jumpTimer: 0, jumpMaxTimer: 14,
+      jumpHeight: 0,
+      jumpStartX: 0, jumpStartY: 0, jumpTargetX: 0, jumpTargetY: 0,
+    },
+    enemies: [],
+    rupees: [],
+    arrows: [],
+    enemyArrows: [],
+    bombEntities: [],
+    bombCooldown: 0,
+    groundItems: [],
+    inventory: {
+      slots: Array(8).fill(null),
+      bag: Array(18).fill(null),
+      selected: -1,
+      cursor: 0,
+    },
+    inventoryScreenOpen: false,
+    invScreenCursor: 0, // 0-25 unified index for full inventory screen
+    invScreenSelected: -1,
+    particles: [],
+    weaponChosen: false,
+    doorOpen: false,
+    won: false,
+    over: false,
+    paused: false,
+    transitioning: false,
+    transitionTimer: 0,
+    transitionRoom: 0,
+    transitionPlayerPos: null,
+    clearedRooms: Array(TOTAL_ROOMS + 3).fill(false), // +3 for side rooms
+    savedEnemies: {}, // roomIdx → saved enemy array
+    keys: {},
+    rooms: JSON.parse(JSON.stringify(ROOM_LAYOUTS)),
+    rupeeStates: ROOM_RUPEES.map(room => room.map(r => ({ x: r.x, y: r.y, collected: false }))),
+    sideRoomReturn: null,
+    respawnPos: { x: 304, y: 380 },
+    checkpoint: null, // { room, x, y } — set after beating Dark Dragon
+  };
+
+  // Randomise items across the three side rooms each new game
+  const itemSlots = [[9,7,8],[9,7,11],[10,7,8],[10,7,11],[11,7,8],[11,7,11]];
+  const itemPool = [T_SHIELD, T_RESPAWN, T_BOMB_ITEM, T_POTION, T_POTION, T_BOMB_ITEM];
+  for (let i = itemPool.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [itemPool[i], itemPool[j]] = [itemPool[j], itemPool[i]];
+  }
+  itemSlots.forEach(([r,row,col], i) => { st.rooms[r][row][col] = itemPool[i]; });
+
+  return st;
+}
+
+const ROOM_INFO = [
+  { name: 'The Armoury',            desc: 'Choose your weapon wisely. There is no going back.' },
+  { name: 'The Forest Clearing',    desc: 'Strange creatures lurk among the trees...' },
+  { name: 'The Dungeon Entrance',   desc: 'Soldiers guard the path ahead. Stay sharp.' },
+  { name: 'The Crystal Cave',       desc: 'Deep underground. Secrets are hidden in these walls...' },
+  { name: 'The Triforce Chamber',   desc: 'A dark power stirs. Defeat it to advance!' },
+  { name: 'The Dark Forest',        desc: 'The trees grow thick and foes grow fierce...' },
+  { name: 'The Fortress Gate',      desc: 'Armored guards block every corridor. Fight through!' },
+  { name: 'The Cursed Caverns',     desc: 'Darkness and water fill these twisted tunnels...' },
+  { name: "Dragon's Throne",        desc: 'The Shadow Dragon awaits. Defeat it and claim the Triforce!' },
+  { name: 'The Shield Vault',       desc: 'A legendary shield rests here. Take it.' },
+  { name: 'The Sanctuary',          desc: 'Ancient magic lingers here. Rest and resupply.' },
+  { name: 'The Bomb Cache',         desc: 'Explosives stored away. Use them to find hidden paths.' },
+];
+
+function loadRoom(s, roomIdx) {
+  s.room = roomIdx;
+  s.doorOpen = false;
+  const enemies = ROOM_ENEMIES[roomIdx] || [];
+  s.enemies = enemies.map(e => {
+    const base = {
+      x: e.x, y: e.y,
+      type: e.type,
+      hp: e.type === 'shadow_dragon' ? 15 : e.type === 'boss' ? 8 : (e.type === 'guard' ? 3 : 2),
+      maxHp: e.type === 'shadow_dragon' ? 15 : e.type === 'boss' ? 8 : (e.type === 'guard' ? 3 : 2),
+      vx: 0, vy: 0,
+      w: (e.type === 'boss' || e.type === 'shadow_dragon') ? 44 : (e.type === 'hopper' ? 20 : 24),
+      h: (e.type === 'boss' || e.type === 'shadow_dragon') ? 44 : (e.type === 'hopper' ? 20 : 24),
+      speed: e.type === 'shadow_dragon' ? 2.0 : e.type === 'boss' ? 1.5 : (e.type === 'guard' ? 1.2 : (e.type === 'hopper' ? 1.0 : 0.8)),
+      dir: 'down',
+      moveTimer: Math.random() * 60,
+      flashTimer: 0,
+      alive: true,
+    };
+    // Guard weapon properties
+    if (e.type === 'guard') {
+      base.attackTimer = 0;
+      base.attackCooldown = 0;
+      base.isAttacking = false;
+    }
+    // Hopper properties
+    if (e.type === 'hopper') {
+      base.jumpState = 'ground';
+      base.jumpTimer = 0;
+      base.jumpHeight = 0;
+      base.jumpTargetX = 0;
+      base.jumpTargetY = 0;
+      base.groundTimer = 60 + Math.floor(Math.random() * 60);
+      base.jumpStartX = e.x;
+      base.jumpStartY = e.y;
+    }
+    return base;
+  });
+  s.rupees = (s.rupeeStates[roomIdx] || []);
+  s.respawnPos = { x: 304, y: 380 };
+  s.bombEntities = [];
+  s.enemyArrows = [];
+  // Only show main room count (rooms 0-8, displayed as 1-8 skipping room 0)
+  if (roomIdx >= 0 && roomIdx < TOTAL_ROOMS) {
+    const displayRoom = roomIdx === 0 ? 1 : roomIdx;
+    document.getElementById('roomLabel').textContent = `Room ${displayRoom}/8`;
+  }
+}
+
+function restartGame() {
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('winScreen').style.display = 'none';
+  state = createState();
+  loadRoom(state, 0);
+  state.player.x = 304;
+  state.player.y = 380;
+  updateHUD();
+  syncInventory();
+}
+
+function goHome() {
+  document.getElementById('gameOverScreen').style.display = 'none';
+  document.getElementById('winScreen').style.display = 'none';
+  restartGame();
+  showHome();
+}
+
+// ─── Input ────────────────────────────────────────────────────
+document.addEventListener('keydown', e => {
+  const isArrow = e.code === 'ArrowUp' || e.code === 'ArrowDown' || e.code === 'ArrowLeft' || e.code === 'ArrowRight';
+
+  // E toggles full inventory screen
+  if (e.code === 'KeyE') {
+    const homeVisible = document.getElementById('homeScreen').style.display === 'flex';
+    const indexVisible = document.getElementById('enemyIndex').style.display === 'flex';
+    if (!homeVisible && !indexVisible && !state.over && !state.won) {
+      state.inventoryScreenOpen = !state.inventoryScreenOpen;
+      if (state.inventoryScreenOpen) {
+        state.invScreenCursor = state.inventory.cursor; // start at hotbar cursor
+        state.invScreenSelected = -1;
+      }
+      state.keys = {};
+    }
+    return;
+  }
+
+  // If inventory screen is open, handle its own navigation
+  if (state.inventoryScreenOpen) {
+    e.preventDefault();
+    const cur = state.invScreenCursor;
+    if (e.code === 'ArrowLeft') {
+      // Move left within row
+      if (cur < 8) { // hotbar row
+        state.invScreenCursor = Math.max(0, cur - 1);
+      } else { // bag: 6 cols
+        const bagIdx = cur - 8;
+        const row = Math.floor(bagIdx / 6);
+        const col = bagIdx % 6;
+        if (col > 0) state.invScreenCursor = 8 + row * 6 + col - 1;
+      }
+    } else if (e.code === 'ArrowRight') {
+      if (cur < 8) {
+        state.invScreenCursor = Math.min(7, cur + 1);
+      } else {
+        const bagIdx = cur - 8;
+        const row = Math.floor(bagIdx / 6);
+        const col = bagIdx % 6;
+        if (col < 5) state.invScreenCursor = 8 + row * 6 + col + 1;
+      }
+    } else if (e.code === 'ArrowUp') {
+      if (cur >= 8) {
+        const bagIdx = cur - 8;
+        const row = Math.floor(bagIdx / 6);
+        const col = bagIdx % 6;
+        if (row > 0) {
+          state.invScreenCursor = 8 + (row-1) * 6 + col;
+        } else {
+          // Jump to hotbar - map col to nearest hotbar slot
+          state.invScreenCursor = Math.min(7, col);
+        }
+      }
+    } else if (e.code === 'ArrowDown') {
+      if (cur < 8) {
+        // Jump from hotbar to first bag row
+        const col = Math.min(5, cur);
+        state.invScreenCursor = 8 + col;
+      } else {
+        const bagIdx = cur - 8;
+        const row = Math.floor(bagIdx / 6);
+        const col = bagIdx % 6;
+        if (row < 2) {
+          state.invScreenCursor = 8 + (row+1) * 6 + col;
+        }
+      }
+    } else if (e.code === 'Enter') {
+      // Select/swap in full inventory
+      invScreenDoSelect(state.invScreenCursor);
+    } else if (e.code === 'Escape') {
+      if (state.invScreenSelected !== -1) {
+        state.invScreenSelected = -1;
+      } else {
+        state.inventoryScreenOpen = false;
+      }
+    } else if (e.code === 'KeyC') {
+      // Drop from inventory screen
+      dropFromSlot(state.invScreenCursor);
+    }
+    return;
+  }
+
+  if (!isArrow) state.keys[e.code] = true;
+  if (isArrow || ['Space','KeyZ','KeyB'].includes(e.code)) e.preventDefault();
+
+  // Pause toggle
+  if ((e.code === 'Escape' || e.code === 'KeyP') && !state.over && !state.won) {
+    const homeVisible = document.getElementById('homeScreen').style.display === 'flex';
+    const indexVisible = document.getElementById('enemyIndex').style.display === 'flex';
+    if (!homeVisible && !indexVisible) {
+      state.paused = !state.paused;
+      state.keys = {};
+    }
+  }
+
+  // C key: drop item at cursor position
+  if (e.code === 'KeyC' && !state.paused && !state.over && !state.won) {
+    const homeVisible = document.getElementById('homeScreen').style.display === 'flex';
+    const indexVisible = document.getElementById('enemyIndex').style.display === 'flex';
+    if (!homeVisible && !indexVisible) {
+      dropFromSlot(state.inventory.cursor);
+    }
+  }
+
+  // Arrow keys navigate the inventory (not used for movement)
+  if (state.paused || state.over || state.won) return;
+  const inv = state.inventory;
+  if (e.code === 'ArrowLeft') {
+    inv.cursor = Math.max(0, inv.cursor - 1);
+    updateInventoryDisplay();
+  } else if (e.code === 'ArrowRight') {
+    inv.cursor = Math.min(7, inv.cursor + 1);
+    updateInventoryDisplay();
+  } else if (e.code === 'ArrowUp') {
+    invKeySelect();
+  } else if (e.code === 'ArrowDown') {
+    if (inv.selected !== -1) { inv.selected = -1; setSwapHint(false); updateInventoryDisplay(); }
+  }
+});
+document.addEventListener('keyup', e => { state.keys[e.code] = false; });
+
+// ─── Drop item from slot ──────────────────────────────────────
+function dropFromSlot(unifiedIdx) {
+  let item;
+  if (unifiedIdx < 8) {
+    item = state.inventory.slots[unifiedIdx];
+    if (!item) return;
+    state.inventory.slots[unifiedIdx] = null;
+  } else {
+    const bagIdx = unifiedIdx - 8;
+    item = state.inventory.bag[bagIdx];
+    if (!item) return;
+    state.inventory.bag[bagIdx] = null;
+  }
+  const p = state.player;
+  state.groundItems.push({
+    x: p.x + p.w/2, y: p.y + p.h/2,
+    type: item.type,
+    count: item.count || 1,
+    roomIdx: state.room,
+    lifetime: 3600, // 60 seconds at 60fps
+    grace: 30, // can't be picked up for 30 frames
+  });
+  syncInventory();
+}
+
+// ─── Inventory screen select/swap ─────────────────────────────
+function invScreenDoSelect(idx) {
+  if (state.invScreenSelected === -1) {
+    // Check if slot has item
+    const item = getUnifiedSlot(idx);
+    if (item) {
+      state.invScreenSelected = idx;
+    }
+  } else if (state.invScreenSelected === idx) {
+    state.invScreenSelected = -1;
+  } else {
+    // Swap
+    const a = state.invScreenSelected;
+    const b = idx;
+    const itemA = getUnifiedSlot(a);
+    const itemB = getUnifiedSlot(b);
+    setUnifiedSlot(a, itemB);
+    setUnifiedSlot(b, itemA);
+    state.invScreenSelected = -1;
+    syncInventory();
+  }
+}
+
+function getUnifiedSlot(idx) {
+  if (idx < 8) return state.inventory.slots[idx];
+  return state.inventory.bag[idx - 8];
+}
+function setUnifiedSlot(idx, item) {
+  if (idx < 8) state.inventory.slots[idx] = item;
+  else state.inventory.bag[idx - 8] = item;
+}
+
+// ─── Collision ────────────────────────────────────────────────
+function getTile(roomIdx, px, py) {
+  const col = Math.floor(px / TILE);
+  const row = Math.floor(py / TILE);
+  if (col < 0 || col >= COLS || row < 0 || row >= ROWS) return T_WALL;
+  return state.rooms[roomIdx][row][col];
+}
+
+function isSolid(tile) {
+  return tile === T_WALL || tile === T_WATER || tile === T_DOOR_C || tile === T_HIDDEN_WALL;
+}
+
+function rectOverlap(ax,ay,aw,ah, bx,by,bw,bh) {
+  return ax < bx+bw && ax+aw > bx && ay < by+bh && ay+ah > by;
+}
+
+function moveEntity(entity, dx, dy, roomIdx) {
+  const pad = 2;
+  let nx = entity.x + dx;
+  let ny = entity.y + dy;
+  const w = entity.w, h = entity.h;
+
+  let xOk = true;
+  const cx = [nx+pad, nx+w/2, nx+w-pad];
+  const cy = [entity.y+pad, entity.y+h-pad];
+  for (let c of cx) for (let r of cy) {
+    if (isSolid(getTile(roomIdx, c, r))) { xOk = false; break; }
+  }
+  if (xOk) entity.x = nx;
+
+  let yOk = true;
+  const cx2 = [entity.x+pad, entity.x+w-pad];
+  const cy2 = [ny+pad, ny+h-pad];
+  for (let c of cx2) for (let r of cy2) {
+    if (isSolid(getTile(roomIdx, c, r))) { yOk = false; break; }
+  }
+  if (yOk) entity.y = ny;
+}
+
+// ─── Sword hitbox ─────────────────────────────────────────────
+function getSwordRect(p) {
+  const r = 14, off = 48;
+  switch(p.dir) {
+    case 'up':    return {x: p.x+p.w/2-r/2, y: p.y-off,   w:r, h:48};
+    case 'down':  return {x: p.x+p.w/2-r/2, y: p.y+p.h,   w:r, h:48};
+    case 'left':  return {x: p.x-off,        y: p.y+p.h/2-r/2, w:48, h:r};
+    case 'right': return {x: p.x+p.w,        y: p.y+p.h/2-r/2, w:48, h:r};
+  }
+}
+
+// Enemy sword hitbox (mirrors player logic)
+function getEnemySwordRect(e) {
+  const r = 12, off = 40;
+  switch(e.dir) {
+    case 'up':    return {x: e.x+e.w/2-r/2, y: e.y-off,   w:r, h:40};
+    case 'down':  return {x: e.x+e.w/2-r/2, y: e.y+e.h,   w:r, h:40};
+    case 'left':  return {x: e.x-off,        y: e.y+e.h/2-r/2, w:40, h:r};
+    case 'right': return {x: e.x+e.w,        y: e.y+e.h/2-r/2, w:40, h:r};
+  }
+}
+
+// ─── Particles ────────────────────────────────────────────────
+function spawnParticles(x, y, color, count=8) {
+  for (let i=0; i<count; i++) {
+    const ang = (Math.PI*2/count)*i + Math.random()*0.5;
+    const spd = 1.5 + Math.random()*2;
+    state.particles.push({
+      x, y,
+      vx: Math.cos(ang)*spd,
+      vy: Math.sin(ang)*spd,
+      life: 25 + Math.random()*15,
+      maxLife: 40,
+      color,
+      r: 3+Math.random()*3
+    });
+  }
+}
+
+// ─── Inventory ────────────────────────────────────────────────
+function updateInventoryDisplay() {
+  const slots = state.inventory.slots;
+  for (let i = 0; i < 8; i++) {
+    const els = INV_ELS[i];
+    const item = slots[i];
+    const def = item ? ITEM_DEFS[item.type] : null;
+    els.slot.classList.toggle('has-item',     !!item);
+    els.slot.classList.toggle('selected',     state.inventory.selected === i);
+    els.slot.classList.toggle('cursor',       state.inventory.cursor   === i);
+    els.slot.classList.toggle('passive-item', !!(item && isPassiveType(item.type)));
+    els.slot.classList.toggle('tier2',        !!(def && def.tier === 2));
+    els.slot.classList.toggle('tier3',        !!(def && def.tier === 3));
+    els.icon.textContent  = def ? def.icon : '';
+    els.name.textContent  = def ? def.name : '';
+    els.count.textContent = (item?.count > 1) ? `x${item.count}` : '';
+  }
+}
+
+function syncInventory() {
+  const p = state.player;
+  const all = state.inventory.slots.filter(Boolean);
+  p.hasShield  = all.some(i => isShield(i.type));
+  p.hasRespawn = all.some(i => i.type === 'respawn');
+  updateInventoryDisplay();
+  updateHUD();
+}
+
+// Returns true if the player is facing toward the enemy (used for shield blocking)
+function isFacingEnemy(p, e) {
+  const dx = (e.x + e.w / 2) - (p.x + p.w / 2);
+  const dy = (e.y + e.h / 2) - (p.y + p.h / 2);
+  if (Math.abs(dx) >= Math.abs(dy)) {
+    return (dx > 0 && p.dir === 'right') || (dx < 0 && p.dir === 'left');
+  } else {
+    return (dy > 0 && p.dir === 'down') || (dy < 0 && p.dir === 'up');
+  }
+}
+
+// Check if player is facing against arrow direction (for blocking)
+function isFacingAgainstArrow(p, arrow) {
+  if (arrow.vx > 0 && p.dir === 'left') return true;
+  if (arrow.vx < 0 && p.dir === 'right') return true;
+  if (arrow.vy > 0 && p.dir === 'up') return true;
+  if (arrow.vy < 0 && p.dir === 'down') return true;
+  return false;
+}
+
+function addToInventory(item) {
+  const slots = state.inventory.slots;
+  const def = ITEM_DEFS[item.type];
+  // Stackable items — add to existing stack in hotbar first, then bag
+  if (def && def.stackable) {
+    const ex = slots.find(s => s?.type === item.type);
+    if (ex) { ex.count += (item.count || 1); syncInventory(); return; }
+    const exBag = state.inventory.bag.find(s => s?.type === item.type);
+    if (exBag) { exBag.count += (item.count || 1); syncInventory(); return; }
+  }
+  // Weapons go to slot 0 if free
+  if (isSword(item.type) || isBow(item.type)) {
+    if (!slots[0]) { slots[0] = item; syncInventory(); return; }
+  }
+  // Fill first empty hotbar slot
+  const empty = slots.findIndex(s => !s);
+  if (empty >= 0) { slots[empty] = item; syncInventory(); return; }
+  // Fill first empty bag slot
+  const emptyBag = state.inventory.bag.findIndex(s => !s);
+  if (emptyBag >= 0) { state.inventory.bag[emptyBag] = item; syncInventory(); return; }
+  // Inventory full — drop on ground
+  state.groundItems.push({
+    x: state.player.x + state.player.w/2,
+    y: state.player.y + state.player.h/2,
+    type: item.type, count: item.count || 1,
+    roomIdx: state.room, lifetime: 3600,
+  });
+  syncInventory();
+}
+
+function setSwapHint(show) {
+  document.getElementById('swapHint').style.display = show ? 'block' : 'none';
+}
+
+function invDoSelect(i) {
+  const inv = state.inventory;
+  if (inv.selected === -1) {
+    inv.selected = i;
+    setSwapHint(true);
+    updateInventoryDisplay();
+  } else if (inv.selected === i) {
+    inv.selected = -1;
+    setSwapHint(false);
+    updateInventoryDisplay();
+  } else {
+    [inv.slots[inv.selected], inv.slots[i]] = [inv.slots[i], inv.slots[inv.selected]];
+    inv.selected = -1;
+    setSwapHint(false);
+    syncInventory();
+  }
+}
+
+function invKeySelect() {
+  invDoSelect(state.inventory.cursor);
+}
+
+function invClick(i) {
+  if (document.getElementById('homeScreen').style.display !== 'none') return;
+  if (document.getElementById('enemyIndex').style.display  !== 'none') return;
+  state.inventory.cursor = i;
+  invDoSelect(i);
+}
+
+// ─── HUD ──────────────────────────────────────────────────────
+function updateHUD() {
+  const p = state.player;
+  let hearts = '';
+  for (let i=0; i<p.maxHp; i+=2) {
+    if (p.hp > i+1) hearts += '❤️';
+    else if (p.hp > i) hearts += '💔';
+    else hearts += '🖤';
+  }
+  for (let i=0; i<p.tempHp; i+=2) hearts += '💛';
+  document.getElementById('heartsDisplay').textContent = hearts;
+}
+
+// ─── Get sword damage from inventory ──────────────────────────
+function getEquippedSwordDef() {
+  const inv0 = state.inventory.slots[0];
+  const inv1 = state.inventory.slots[1];
+  if (inv0 && isSword(inv0.type)) return ITEM_DEFS[inv0.type];
+  if (inv1 && isSword(inv1.type)) return ITEM_DEFS[inv1.type];
+  return null;
+}
+
+function getEquippedBowDef() {
+  const inv0 = state.inventory.slots[0];
+  const inv1 = state.inventory.slots[1];
+  if (inv0 && isBow(inv0.type)) return ITEM_DEFS[inv0.type];
+  if (inv1 && isBow(inv1.type)) return ITEM_DEFS[inv1.type];
+  return null;
+}
+
+function getShieldItem() {
+  const idx = state.inventory.slots.findIndex(s => s && isShield(s.type));
+  if (idx >= 0) return { idx, item: state.inventory.slots[idx] };
+  return null;
+}
+
+// ─── Boss death helper ────────────────────────────────────────
+function onBossDeath(e, roomIdx) {
+  if (roomIdx === 4) {
+    // Room 4 boss: checkpoint so player respawns here if they die later
+    state.checkpoint = { room: 4, x: state.player.x, y: state.player.y };
+  } else if (roomIdx === 8) {
+    // Room 8 boss: reveal triforce
+    state.rooms[8][6][9] = T_TRIFORCE;
+    spawnParticles(9*TILE+16, 6*TILE+16, '#FFD700', 24);
+  }
+  rollDrops(e);
+}
+
+// ─── Shield block helper ──────────────────────────────────────
+function tryShieldBlock(p) {
+  const sh = getShieldItem();
+  if (!sh) return false;
+  const def = ITEM_DEFS[sh.item.type];
+  sh.item.count--;
+  if (sh.item.count <= 0) {
+    state.inventory.slots[sh.idx] = null;
+    spawnParticles(p.x+p.w/2, p.y+p.h/2, '#4488ff', 20);
+  } else {
+    spawnParticles(p.x+p.w/2, p.y+p.h/2, '#88aaff', 5);
+  }
+  syncInventory();
+  p.invincible = 30;
+  return true;
+}
+
+// ─── Damage player helper ─────────────────────────────────────
+function damagePlayer(dmg) {
+  const p = state.player;
+  if (dmg > 0 && p.tempHp > 0) {
+    const absorbed = Math.min(dmg, p.tempHp);
+    p.tempHp -= absorbed;
+    dmg -= absorbed;
+  }
+  p.hp -= dmg;
+  p.invincible = 60;
+  spawnParticles(p.x+p.w/2, p.y+p.h/2, '#f00', 8);
+  updateHUD();
+  if (p.hp <= 0) {
+    if (p.hasRespawn) {
+      p.hasRespawn = false;
+      const rIdx = state.inventory.slots.findIndex(s => s?.type === 'respawn');
+      if (rIdx >= 0) {
+        state.inventory.slots[rIdx] = null;
+        syncInventory();
+        const slotEl = INV_ELS[rIdx].slot;
+        slotEl.classList.add('consumed');
+        setTimeout(() => slotEl.classList.remove('consumed'), 650);
+      }
+      p.hp = Math.ceil(p.maxHp / 2);
+      p.x = state.respawnPos.x;
+      p.y = state.respawnPos.y;
+      p.invincible = 120;
+      spawnParticles(p.x+p.w/2, p.y+p.h/2, '#44ff88', 20);
+      updateHUD();
+    } else if (state.checkpoint) {
+      // Respawn at checkpoint (e.g. after Dark Dragon)
+      const cp = state.checkpoint;
+      state.checkpoint = null; // one-time use
+      loadRoom(state, cp.room);
+      if (state.savedEnemies[cp.room]) {
+        state.enemies = JSON.parse(JSON.stringify(state.savedEnemies[cp.room]));
+      }
+      if (state.clearedRooms[cp.room]) {
+        state.enemies.forEach(en => en.alive = false);
+        state.doorOpen = true;
+        const layout = state.rooms[cp.room];
+        for (let c = 0; c < COLS; c++) {
+          if (layout[0][c] === T_DOOR_C) layout[0][c] = T_DOOR_O;
+        }
+      }
+      p.hp = Math.ceil(p.maxHp / 2);
+      p.x = cp.x;
+      p.y = cp.y;
+      p.invincible = 120;
+      spawnParticles(p.x+p.w/2, p.y+p.h/2, '#44ff88', 20);
+      updateHUD();
+    } else {
+      state.over = true;
+      setTimeout(() => {
+        document.getElementById('gameOverScreen').style.display = 'flex';
+      }, 800);
+    }
+  }
+}
+
+// ─── Update ───────────────────────────────────────────────────
+function update() {
+  if (state.over || state.won || state.paused || state.inventoryScreenOpen) return;
+
+  // Handle transition screen
+  if (state.transitioning) {
+    state.transitionTimer--;
+    const elapsed = 600 - state.transitionTimer;
+    const anyKey = elapsed > 90 && (state.keys['Space'] || state.keys['KeyZ'] || state.keys['KeyW'] || state.keys['KeyA'] || state.keys['KeyS'] || state.keys['KeyD']);
+    if (state.transitionTimer <= 0 || anyKey) {
+      const goingBack = state.transitionPlayerPos !== null;
+      const pos = state.transitionPlayerPos ?? { x: 304, y: 380 };
+      state.transitioning = false;
+      state.transitionPlayerPos = null;
+      const destRoom = state.transitionRoom;
+      loadRoom(state, destRoom);
+      // Restore saved enemies if we've been to this room before
+      if (state.savedEnemies[destRoom]) {
+        state.enemies = JSON.parse(JSON.stringify(state.savedEnemies[destRoom]));
+      }
+      state.player.x = pos.x;
+      state.player.y = pos.y;
+      if (state.clearedRooms[state.room]) {
+        state.doorOpen = true;
+        const layout = state.rooms[state.room];
+        for (let c = 0; c < COLS; c++) {
+          if (layout[0][c] === T_DOOR_C) layout[0][c] = T_DOOR_O;
+        }
+      }
+    }
+    return;
+  }
+
+  const p = state.player;
+  const k = state.keys;
+  const roomIdx = state.room;
+
+  // Movement — WASD
+  let mx = 0, my = 0;
+  if (k['KeyW']) { my = -1; p.dir = 'up'; }
+  if (k['KeyS']) { my =  1; p.dir = 'down'; }
+  if (k['KeyA']) { mx = -1; p.dir = 'left'; }
+  if (k['KeyD']) { mx =  1; p.dir = 'right'; }
+  if (mx && my) { mx *= 0.707; my *= 0.707; }
+  if (p.jumpActive) { mx = 0; my = 0; }
+  moveEntity(p, mx * p.speed, my * p.speed, roomIdx);
+
+  // Jump-over-water
+  if (p.jumpActive) {
+    const t = (p.jumpMaxTimer - p.jumpTimer) / p.jumpMaxTimer;
+    p.x = p.jumpStartX + (p.jumpTargetX - p.jumpStartX) * t;
+    p.y = p.jumpStartY + (p.jumpTargetY - p.jumpStartY) * t;
+    p.jumpHeight = Math.sin(Math.PI * t) * 20;
+    if (--p.jumpTimer <= 0) {
+      p.x = p.jumpTargetX; p.y = p.jumpTargetY;
+      p.jumpActive = false; p.jumpHeight = 0;
+      spawnParticles(p.x+p.w/2, p.y+p.h, '#88cc88', 6);
+    }
+  } else if ((mx !== 0 || my !== 0) && !state.sideRoomReturn) {
+    const DIR = { right:[1,0], left:[-1,0], down:[0,1], up:[0,-1] };
+    const [ddx, ddy] = DIR[p.dir];
+    const pcx = Math.floor((p.x + p.w/2) / TILE);
+    const pcy = Math.floor((p.y + p.h/2) / TILE);
+    const layout = state.rooms[roomIdx];
+    if (layout[pcy + ddy]?.[pcx + ddx] === T_WATER) {
+      let count = 0, nx = pcx + ddx, ny = pcy + ddy;
+      while (layout[ny]?.[nx] === T_WATER) { count++; nx += ddx; ny += ddy; }
+      const landable = layout[ny]?.[nx] !== undefined && !isSolid(layout[ny]?.[nx]) && layout[ny]?.[nx] !== T_WATER;
+      if (count === 1 && landable) {
+        p.jumpActive = true;
+        p.jumpTimer = p.jumpMaxTimer;
+        p.jumpStartX = p.x; p.jumpStartY = p.y;
+        p.jumpTargetX = nx * TILE + (TILE - p.w) / 2;
+        p.jumpTargetY = ny * TILE + (TILE - p.h) / 2;
+      }
+    }
+  }
+
+  // Room transition (door at top)
+  const inDoorCols = p.x + p.w > 9 * TILE && p.x < 11 * TILE;
+  // Room 4 boss: after boss dies, go north to room 5 (not win)
+  // Room 8 has triforce, game ends there
+  const maxMainRoom = TOTAL_ROOMS - 1; // 8
+  if (state.doorOpen && roomIdx < maxMainRoom && roomIdx < TOTAL_ROOMS && p.y < TILE && inDoorCols) {
+    // Save current room's enemies before leaving
+    state.savedEnemies[roomIdx] = JSON.parse(JSON.stringify(state.enemies));
+    state.transitioning = true;
+    state.transitionTimer = 600;
+    state.transitionRoom = roomIdx + 1;
+    state.transitionPlayerPos = null;
+    state.keys = {};
+    return;
+  }
+
+  // South return door
+  if (roomIdx > 0 && roomIdx < TOTAL_ROOMS && !state.sideRoomReturn && p.y + p.h > H - TILE && inDoorCols) {
+    // Save current room's enemies before leaving
+    state.savedEnemies[roomIdx] = JSON.parse(JSON.stringify(state.enemies));
+    state.transitioning = true;
+    state.transitionTimer = 600;
+    state.transitionRoom = roomIdx - 1;
+    state.transitionPlayerPos = { x: 304, y: 2 * TILE };
+    state.keys = {};
+    return;
+  }
+
+  // East door — enter side room (rooms 1, 2, 3 have east doors)
+  const sideIdx = SIDE_ROOM_MAP[roomIdx];
+  if (sideIdx !== undefined && !state.sideRoomReturn) {
+    if (p.x + p.w > W - TILE + 4 && p.y + p.h > 6*TILE && p.y < 8*TILE) {
+      state.sideRoomReturn = {
+        room: roomIdx,
+        px: W - 3*TILE, py: 6*TILE + (TILE - p.h)/2,
+        enemies: JSON.parse(JSON.stringify(state.enemies)),
+        rupees: JSON.parse(JSON.stringify(state.rupees)),
+        doorOpen: state.doorOpen,
+      };
+      state.room = sideIdx;
+      state.enemies = [];
+      state.rupees = [];
+      state.doorOpen = false;
+      state.bombEntities = [];
+      state.enemyArrows = [];
+      p.x = 2 * TILE;
+      p.y = 6*TILE + (TILE - p.h)/2;
+      document.getElementById('roomLabel').textContent = ROOM_INFO[sideIdx]?.name || `Side Room`;
+      return;
+    }
+  }
+
+  // West door — return from side room
+  if (state.sideRoomReturn && p.x < TILE - 4 && p.y + p.h > 6*TILE && p.y < 8*TILE) {
+    const ret = state.sideRoomReturn;
+    state.room = ret.room;
+    state.enemies = ret.enemies;
+    state.rupees = ret.rupees;
+    state.doorOpen = ret.doorOpen;
+    state.bombEntities = [];
+    state.enemyArrows = [];
+    p.x = ret.px;
+    p.y = ret.py;
+    state.sideRoomReturn = null;
+    const displayRoom = ret.room === 0 ? 1 : ret.room;
+    document.getElementById('roomLabel').textContent = `Room ${displayRoom}/8`;
+    return;
+  }
+
+  // Derive weapon from inventory
+  const inv0 = state.inventory.slots[0];
+  const inv1 = state.inventory.slots[1];
+  p.weapon = null;
+  if (inv0 && (isSword(inv0.type) || isBow(inv0.type))) p.weapon = inv0.type;
+  else if (inv1 && (isSword(inv1.type) || isBow(inv1.type))) p.weapon = inv1.type;
+
+  // Sword attack
+  const swordDef = getEquippedSwordDef();
+  const swordZ = inv0 && isSword(inv0.type) && (k['Space'] || k['KeyZ']);
+  const swordX = inv1 && isSword(inv1.type) && k['KeyX'];
+  if ((swordZ || swordX) && !p.attacking && swordDef) {
+    p.attacking = true;
+    p.attackDur = swordDef.attackDur;
+    p.attackTimer = swordDef.attackDur;
+    p.hitSet = new Set();
+  }
+  if (p.attacking) {
+    p.attackTimer--;
+    if (p.attackTimer <= 0) p.attacking = false;
+    const sw = getSwordRect(p);
+    const sDef = getEquippedSwordDef();
+    const swordDmg = sDef ? sDef.dmg : 1;
+    for (const e of state.enemies) {
+      if (!e.alive || p.hitSet.has(e)) continue;
+      if (rectOverlap(sw.x,sw.y,sw.w,sw.h, e.x,e.y,e.w,e.h)) {
+        p.hitSet.add(e);
+        e.hp -= swordDmg;
+        e.flashTimer = 8;
+        spawnParticles(e.x+e.w/2, e.y+e.h/2, e.type==='boss' ? '#ff4' : '#f44', 4);
+        if (e.hp <= 0) {
+          e.alive = false;
+          spawnParticles(e.x+e.w/2, e.y+e.h/2, '#ff0', 8);
+          if (e.type === 'boss' || e.type === 'shadow_dragon') onBossDeath(e, roomIdx);
+          else rollDrops(e);
+        }
+      }
+    }
+  }
+
+  // Weapon pickup in Room 0
+  if (roomIdx === 0 && !state.weaponChosen) {
+    const layout = state.rooms[0];
+    for (const [tc, tr, wep] of [[15,4,'sword_wood'],[15,10,'bow_wood']]) {
+      const tileType = isSword(wep) ? T_SWORD : T_BOW;
+      if (layout[tr][tc] === tileType) {
+        if (rectOverlap(p.x,p.y,p.w,p.h, tc*TILE, tr*TILE, TILE, TILE)) {
+          state.weaponChosen = true;
+          layout[4][15] = T_PATH;
+          layout[10][15] = T_PATH;
+          spawnParticles(tc*TILE+16, tr*TILE+16, isSword(wep)?'#ccc':'#8B4513', 12);
+          addToInventory({ type: wep });
+        }
+      }
+    }
+  }
+
+  // Item pickups in side rooms
+  for (const [r, row, col] of [[9,7,8],[9,7,11],[10,7,8],[10,7,11],[11,7,8],[11,7,11]]) {
+    if (roomIdx !== r) continue;
+    const layout = state.rooms[r];
+    const tile = layout[row][col];
+    if (!tile) continue;
+    if (!rectOverlap(p.x,p.y,p.w,p.h, col*TILE,row*TILE,TILE,TILE)) continue;
+    layout[row][col] = (r === 10) ? T_PATH : T_GRASS;
+    const px = col*TILE+16, py = row*TILE+16;
+    if (tile === T_SHIELD)    { addToInventory({ type:'shield_wood', count:5 }); spawnParticles(px,py,'#4488ff',12); }
+    if (tile === T_RESPAWN)   { addToInventory({ type:'respawn' });              spawnParticles(px,py,'#44ff88',12); }
+    if (tile === T_BOMB_ITEM) { addToInventory({ type:'bomb', count:3 });        spawnParticles(px,py,'#aaaaaa',12); }
+    if (tile === T_POTION)    { addToInventory({ type:'potion' });               spawnParticles(px,py,'#ff88ff',12); }
+  }
+
+  // Bomb placement
+  if (state.bombCooldown > 0) state.bombCooldown--;
+  const bombSlot = (inv0?.type === 'bomb') ? 0 : ((inv1?.type === 'bomb') ? 1 : -1);
+  if (bombSlot >= 0 && state.bombCooldown <= 0) {
+    const useZ = inv0?.type === 'bomb' && (k['Space'] || k['KeyZ']);
+    const useX = inv1?.type === 'bomb' && k['KeyX'];
+    if (useZ || useX) {
+      const bItem = state.inventory.slots[bombSlot];
+      bItem.count--;
+      if (bItem.count <= 0) state.inventory.slots[bombSlot] = null;
+      state.bombCooldown = 15;
+      const bx = Math.round((p.x + p.w/2) / TILE) * TILE - TILE/2;
+      const by = Math.round((p.y + p.h/2) / TILE) * TILE - TILE/2;
+      state.bombEntities.push({ x: bx, y: by, timer: 180, alive: true });
+      syncInventory();
+    }
+  }
+
+  // Potion use
+  const potZ = inv0?.type === 'potion' && (k['Space'] || k['KeyZ']);
+  const potX = inv1?.type === 'potion' && k['KeyX'];
+  if (potZ || potX) {
+    const pSlot = potZ ? 0 : 1;
+    let heal = 6;
+    const hpGain = Math.min(heal, p.maxHp - p.hp);
+    p.hp += hpGain;
+    heal -= hpGain;
+    if (heal > 0) p.tempHp = Math.min(10, p.tempHp + heal);
+    state.inventory.slots[pSlot] = null;
+    spawnParticles(p.x+p.w/2, p.y+p.h/2, '#ff88ff', 16);
+    syncInventory();
+    updateHUD();
+  }
+
+  // Bomb countdown & explosion
+  state.bombEntities = state.bombEntities.filter(b => b.alive);
+  for (const b of state.bombEntities) {
+    b.timer--;
+    if (b.timer <= 0) {
+      b.alive = false;
+      spawnParticles(b.x + TILE/2, b.y + TILE/2, '#f80', 20);
+      spawnParticles(b.x + TILE/2, b.y + TILE/2, '#fff', 10);
+      const layout = state.rooms[roomIdx];
+      const bc = Math.round(b.x / TILE), br = Math.round(b.y / TILE);
+      for (let dr = -2; dr <= 2; dr++) {
+        for (let dc = -2; dc <= 2; dc++) {
+          if (Math.abs(dr) + Math.abs(dc) > 2) continue;
+          const er = br + dr, ec = bc + dc;
+          if (er < 0 || er >= ROWS || ec < 0 || ec >= COLS) continue;
+          if (layout[er][ec] === T_HIDDEN_WALL) {
+            layout[er][ec] = T_GRASS;
+            state.groundItems.push({
+              x: ec*TILE+16, y: er*TILE+16,
+              type: 'rupee', count: 1,
+              roomIdx: roomIdx, lifetime: 3600,
+            });
+            spawnParticles(ec*TILE+16, er*TILE+16, '#888', 6);
+          }
+          for (const e of state.enemies) {
+            if (!e.alive) continue;
+            if (rectOverlap(ec*TILE, er*TILE, TILE, TILE, e.x, e.y, e.w, e.h)) {
+              e.hp -= 2;
+              e.flashTimer = 12;
+              if (e.hp <= 0) {
+                e.alive = false; spawnParticles(e.x+e.w/2,e.y+e.h/2,'#ff0',8);
+                if (e.type === 'boss' || e.type === 'shadow_dragon') onBossDeath(e, roomIdx);
+                else rollDrops(e);
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  // Door logic
+  const canOpenDoor = roomIdx === 0 ? state.weaponChosen : state.enemies.every(e => !e.alive);
+  if (canOpenDoor && !state.doorOpen) {
+    state.doorOpen = true;
+    state.clearedRooms[roomIdx] = true;
+    const layout = state.rooms[roomIdx];
+    for (let c=0; c<COLS; c++) {
+      if (layout[0][c] === T_DOOR_C) layout[0][c] = T_DOOR_O;
+    }
+  }
+
+  // Bow shooting
+  const bowDef = getEquippedBowDef();
+  if (bowDef) {
+    if (p.bowCooldown > 0) p.bowCooldown--;
+    const bowZ = inv0 && isBow(inv0.type) && (k['Space'] || k['KeyZ']);
+    const bowX = inv1 && isBow(inv1.type) && k['KeyX'];
+    if ((bowZ || bowX) && p.bowCooldown === 0) {
+      const spd = 6;
+      const acx = p.x + p.w/2 - 4, acy = p.y + p.h/2 - 4;
+      const vx = p.dir==='left'?-spd : p.dir==='right'?spd : 0;
+      const vy = p.dir==='up'?-spd : p.dir==='down'?spd : 0;
+      state.arrows.push({ x:acx, y:acy, vx, vy, dist:0, alive:true, dmg: bowDef.arrowDmg });
+      p.bowCooldown = bowDef.cooldown;
+    }
+  }
+
+  // Arrow update
+  state.arrows = state.arrows.filter(a => a.alive);
+  for (const a of state.arrows) {
+    a.x += a.vx; a.y += a.vy;
+    a.dist += Math.abs(a.vx) + Math.abs(a.vy);
+    if (a.dist > 10*TILE) { a.alive = false; continue; }
+    if (isSolid(getTile(roomIdx, a.x+4, a.y+4))) { a.alive = false; continue; }
+    for (const e of state.enemies) {
+      if (!e.alive) continue;
+      if (rectOverlap(a.x,a.y,8,8, e.x,e.y,e.w,e.h)) {
+        a.alive = false;
+        e.hp -= (a.dmg || 1);
+        e.flashTimer = 8;
+        spawnParticles(a.x, a.y, '#fc0', 4);
+        if (e.hp <= 0) {
+          e.alive = false; spawnParticles(e.x+e.w/2,e.y+e.h/2,'#ff0',8);
+          if (e.type === 'boss' || e.type === 'shadow_dragon') onBossDeath(e, roomIdx);
+          else rollDrops(e);
+        }
+        break;
+      }
+    }
+  }
+
+  // Triforce pickup (room 8)
+  if (roomIdx === 8) {
+    const layout = state.rooms[roomIdx];
+    const tc = 9, tr = 6;
+    if (layout[tr][tc] === T_TRIFORCE) {
+      if (rectOverlap(p.x,p.y,p.w,p.h, tc*TILE,tr*TILE,TILE,TILE)) {
+        layout[tr][tc] = T_GRASS;
+        spawnParticles(tc*TILE+16, tr*TILE+16, '#FFD700', 32);
+        state.won = true;
+        setTimeout(() => {
+          document.getElementById('winScreen').style.display = 'flex';
+        }, 1200);
+        return;
+      }
+    }
+  }
+
+  // Rupees (ground pickups from room layout) — now add to inventory as rupee items
+  for (const r of state.rupees) {
+    if (!r.collected && rectOverlap(p.x,p.y,p.w,p.h, r.x-8,r.y-8,16,16)) {
+      r.collected = true;
+      addToInventory({ type: 'rupee', count: 1 });
+      spawnParticles(r.x, r.y, '#00f', 6);
+    }
+  }
+
+  // Ground items update
+  state.groundItems = state.groundItems.filter(gi => gi.roomIdx === roomIdx && gi.lifetime > 0);
+  for (const gi of state.groundItems) {
+    gi.lifetime--;
+    if (gi.grace > 0) { gi.grace--; continue; }
+    // Player walk-over pickup
+    if (rectOverlap(p.x, p.y, p.w, p.h, gi.x - 10, gi.y - 10, 20, 20)) {
+      addToInventory({ type: gi.type, count: gi.count || 1 });
+      spawnParticles(gi.x, gi.y, '#0f0', 4);
+      gi.lifetime = 0; // remove
+    }
+  }
+  state.groundItems = state.groundItems.filter(gi => gi.lifetime > 0);
+
+  // ── Enemy arrows update ──────────────────────────────────────
+  state.enemyArrows = state.enemyArrows.filter(a => a.alive);
+  for (const a of state.enemyArrows) {
+    a.x += a.vx; a.y += a.vy;
+    a.dist += Math.abs(a.vx) + Math.abs(a.vy);
+    if (a.dist > 8*TILE) { a.alive = false; continue; }
+    if (isSolid(getTile(roomIdx, a.x+4, a.y+4))) { a.alive = false; continue; }
+    // Hit player
+    if (p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, a.x,a.y,8,8)) {
+      a.alive = false;
+      if (p.hasShield && isFacingAgainstArrow(p, a)) {
+        tryShieldBlock(p);
+      } else {
+        damagePlayer(1);
+      }
+    }
+  }
+
+  // Enemies update
+  for (const e of state.enemies) {
+    if (!e.alive) continue;
+    if (e.flashTimer > 0) e.flashTimer--;
+
+    // ── Hopper AI ──────────────────────────────────────────────
+    if (e.type === 'hopper') {
+      if (e.jumpState === 'ground') {
+        e.groundTimer--;
+        if (e.groundTimer <= 0) {
+          // Pick jump target toward player
+          const dx = p.x - e.x, dy = p.y - e.y;
+          const len = Math.sqrt(dx*dx+dy*dy) || 1;
+          const jumpDist = 80 + Math.random() * 60;
+          e.jumpTargetX = e.x + (dx/len) * jumpDist;
+          e.jumpTargetY = e.y + (dy/len) * jumpDist;
+          // Clamp to bounds
+          e.jumpTargetX = Math.max(TILE, Math.min(W - TILE - e.w, e.jumpTargetX));
+          e.jumpTargetY = Math.max(TILE, Math.min(H - TILE - e.h, e.jumpTargetY));
+          e.jumpStartX = e.x;
+          e.jumpStartY = e.y;
+          e.jumpState = 'jumping';
+          e.jumpTimer = 30;
+        }
+      } else if (e.jumpState === 'jumping') {
+        e.jumpTimer--;
+        const t = 1 - (e.jumpTimer / 30);
+        e.x = e.jumpStartX + (e.jumpTargetX - e.jumpStartX) * t;
+        e.y = e.jumpStartY + (e.jumpTargetY - e.jumpStartY) * t;
+        e.jumpHeight = Math.sin(Math.PI * t) * 40;
+        if (e.jumpTimer <= 0) {
+          e.x = e.jumpTargetX;
+          e.y = e.jumpTargetY;
+          e.jumpHeight = 0;
+          e.jumpState = 'ground';
+          e.groundTimer = 60 + Math.floor(Math.random() * 60);
+          // Landing splash
+          spawnParticles(e.x + e.w/2, e.y + e.h, '#88cc88', 4);
+          // Landing damage check
+          if (p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, e.x-8,e.y-8,e.w+16,e.h+16)) {
+            if (p.hasShield && isFacingEnemy(p, e)) {
+              tryShieldBlock(p);
+            } else {
+              damagePlayer(1);
+            }
+          }
+        }
+      }
+      // Hoppers skip normal movement
+      // But still check collision when on ground
+      if (e.jumpState === 'ground') {
+        if (p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, e.x,e.y,e.w,e.h)) {
+          if (p.hasShield && isFacingEnemy(p, e)) {
+            tryShieldBlock(p);
+          } else {
+            damagePlayer(1);
+          }
+        }
+      }
+      continue; // skip normal enemy movement
+    }
+
+    // ── Guard weapon AI ────────────────────────────────────────
+    if (e.type === 'guard') {
+      if (e.attackCooldown > 0) e.attackCooldown--;
+
+      // Face player
+      const gdx = p.x - e.x, gdy = p.y - e.y;
+      const gDist = Math.sqrt(gdx*gdx + gdy*gdy);
+      if (Math.abs(gdx) >= Math.abs(gdy)) {
+        e.dir = gdx > 0 ? 'right' : 'left';
+      } else {
+        e.dir = gdy > 0 ? 'down' : 'up';
+      }
+
+      // Melee attack
+      if (gDist < 64 && e.attackCooldown <= 0 && !e.isAttacking) {
+        e.isAttacking = true;
+        e.attackTimer = 15;
+        e.attackCooldown = 90;
+      }
+
+      // Ranged attack
+      if (gDist >= 96 && gDist <= 256 && e.attackCooldown <= 0 && !e.isAttacking) {
+        // Shoot arrow toward player
+        const spd = 4;
+        const adx = p.x + p.w/2 - (e.x + e.w/2);
+        const ady = p.y + p.h/2 - (e.y + e.h/2);
+        const alen = Math.sqrt(adx*adx + ady*ady) || 1;
+        state.enemyArrows.push({
+          x: e.x + e.w/2 - 4, y: e.y + e.h/2 - 4,
+          vx: (adx/alen) * spd, vy: (ady/alen) * spd,
+          dist: 0, alive: true,
+        });
+        e.attackCooldown = 120;
+      }
+
+      // Update melee attack
+      if (e.isAttacking) {
+        e.attackTimer--;
+        if (e.attackTimer <= 0) e.isAttacking = false;
+        // Check sword hitbox against player
+        const esw = getEnemySwordRect(e);
+        if (p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, esw.x,esw.y,esw.w,esw.h)) {
+          if (p.hasShield && isFacingEnemy(p, e)) {
+            tryShieldBlock(p);
+          } else {
+            damagePlayer(1);
+          }
+        }
+      }
+    }
+
+    // Normal movement AI
+    e.moveTimer--;
+    if (e.moveTimer <= 0) {
+      if (e.type === 'slime') {
+        const dirs = [{vx:0,vy:-e.speed},{vx:0,vy:e.speed},{vx:-e.speed,vy:0},{vx:e.speed,vy:0}];
+        const d = dirs[Math.floor(Math.random()*4)];
+        e.vx = d.vx; e.vy = d.vy;
+        e.moveTimer = 40 + Math.random()*40;
+      } else {
+        const dx = p.x - e.x, dy = p.y - e.y;
+        const len = Math.sqrt(dx*dx+dy*dy) || 1;
+        e.vx = (dx/len)*e.speed;
+        e.vy = (dy/len)*e.speed;
+        e.moveTimer = 20 + Math.random()*30;
+      }
+    }
+    moveEntity(e, e.vx, e.vy, roomIdx);
+
+    // Enemy hits player (contact damage for non-guard melee, since guard has sword)
+    if (e.type !== 'guard' && p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, e.x,e.y,e.w,e.h)) {
+      let dmg = (e.type==='boss' || e.type==='shadow_dragon') ? 2 : 1;
+      if (p.hasShield && isFacingEnemy(p, e)) {
+        tryShieldBlock(p);
+      } else {
+        damagePlayer(dmg);
+      }
+    }
+
+    // Guard contact damage (separate from melee sword)
+    if (e.type === 'guard' && !e.isAttacking && p.invincible <= 0 && rectOverlap(p.x,p.y,p.w,p.h, e.x,e.y,e.w,e.h)) {
+      if (p.hasShield && isFacingEnemy(p, e)) {
+        tryShieldBlock(p);
+      } else {
+        damagePlayer(1);
+      }
+    }
+  }
+
+  if (p.invincible > 0) p.invincible--;
+
+  // Particles
+  let wi = 0;
+  for (let pi = 0; pi < state.particles.length; pi++) {
+    const pt = state.particles[pi];
+    if (pt.life <= 0) continue;
+    pt.x += pt.vx; pt.y += pt.vy;
+    pt.vx *= 0.92; pt.vy *= 0.92;
+    pt.life--;
+    state.particles[wi++] = pt;
+  }
+  state.particles.length = wi;
+}
+
+// ─── Draw ─────────────────────────────────────────────────────
+function tileVariant(col, row) { return (col*7+row*13) % 3; }
+
+function drawTile(tile, col, row) {
+  const x = col*TILE, y = row*TILE;
+  if (tile === T_HIDDEN_WALL) tile = T_WALL;
+  const colors = TILE_COLORS[tile] || TILE_COLORS[T_GRASS];
+  ctx.fillStyle = colors[tileVariant(col,row)];
+  ctx.fillRect(x, y, TILE, TILE);
+
+  if (tile === T_WALL) {
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fillRect(x+2, y+TILE-6, TILE-4, 4);
+    ctx.fillStyle = 'rgba(255,255,255,0.12)';
+    ctx.fillRect(x+2, y+2, TILE-4, 4);
+  }
+  if (tile === T_WATER) {
+    ctx.fillStyle = 'rgba(255,255,255,0.1)';
+    ctx.fillRect(x+4, y+8, 8, 2);
+    ctx.fillRect(x+18, y+18, 6, 2);
+  }
+  if (tile === T_PATH) {
+    ctx.fillStyle = 'rgba(0,0,0,0.1)';
+    ctx.fillRect(x+2, y+2, TILE-4, TILE-4);
+  }
+  if (tile === T_DOOR_C) {
+    ctx.fillStyle = '#5a2500';
+    ctx.fillRect(x+2, y+2, TILE-4, TILE-4);
+    ctx.fillStyle = '#8B4513';
+    ctx.fillRect(x+6, y+4, TILE-12, TILE-8);
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.arc(x+TILE/2, y+TILE/2, 3, 0, Math.PI*2);
+    ctx.fill();
+  }
+  if (tile === T_DOOR_O) {
+    ctx.fillStyle = 'rgba(255,255,0,0.3)';
+    ctx.fillRect(x, y, TILE, TILE);
+  }
+  if (tile === T_TRIFORCE) {
+    ctx.fillStyle = '#FFD700';
+    ctx.beginPath();
+    ctx.moveTo(x+4, y+TILE-4);
+    ctx.lineTo(x+TILE/2-2, y+TILE/2+2);
+    ctx.lineTo(x+4, y+TILE/2+2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+TILE-4, y+TILE-4);
+    ctx.lineTo(x+TILE/2+2, y+TILE/2+2);
+    ctx.lineTo(x+TILE-4, y+TILE/2+2);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(x+TILE/2, y+4);
+    ctx.lineTo(x+TILE-4, y+TILE-4);
+    ctx.lineTo(x+4, y+TILE-4);
+    ctx.closePath();
+    ctx.fill();
+    ctx.shadowColor = '#FFD700';
+    ctx.shadowBlur = 12;
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  if (tile === T_SWORD) {
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x+10, y+22, 12, 6);
+    ctx.fillStyle = '#ddd';
+    ctx.fillRect(x+14, y+6, 4, 18);
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.moveTo(x+16,y+4); ctx.lineTo(x+13,y+8); ctx.lineTo(x+19,y+8); ctx.fill();
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(x+10, y+20, 12, 3);
+    ctx.shadowColor = '#aaf';
+    ctx.shadowBlur = 8;
+    ctx.fillRect(x+14, y+6, 4, 18);
+    ctx.shadowBlur = 0;
+  }
+  if (tile === T_BOW) {
+    ctx.fillStyle = '#888';
+    ctx.fillRect(x+10, y+22, 12, 6);
+    ctx.strokeStyle = '#8B4513';
+    ctx.lineWidth = 3;
+    ctx.beginPath();
+    ctx.arc(x+16, y+14, 10, Math.PI*0.6, Math.PI*1.4);
+    ctx.stroke();
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(x+9, y+8); ctx.lineTo(x+9, y+20);
+    ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.shadowColor = '#8B4513';
+    ctx.shadowBlur = 8;
+    ctx.beginPath(); ctx.arc(x+16, y+14, 10, Math.PI*0.6, Math.PI*1.4); ctx.stroke();
+    ctx.shadowBlur = 0;
+  }
+  if (tile === T_DOOR_E) {
+    ctx.fillStyle = '#3a2008';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.fillStyle = '#5a3010';
+    ctx.fillRect(x+2, y+2, 8, TILE-4);
+    ctx.fillRect(x, y+2, TILE, 4);
+    ctx.fillRect(x, y+TILE-6, TILE, 4);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2192', x+TILE/2+2, y+TILE/2+6);
+    ctx.textAlign = 'left';
+  }
+  if (tile === T_DOOR_W) {
+    ctx.fillStyle = '#3a2008';
+    ctx.fillRect(x, y, TILE, TILE);
+    ctx.fillStyle = '#5a3010';
+    ctx.fillRect(x+TILE-10, y+2, 8, TILE-4);
+    ctx.fillRect(x, y+2, TILE, 4);
+    ctx.fillRect(x, y+TILE-6, TILE, 4);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('\u2190', x+TILE/2-2, y+TILE/2+6);
+    ctx.textAlign = 'left';
+  }
+  if (tile === T_SHIELD) {
+    ctx.fillStyle = '#888'; ctx.fillRect(x+10, y+22, 12, 6);
+    ctx.fillStyle = '#2255cc';
+    ctx.beginPath();
+    ctx.moveTo(x+16, y+4); ctx.lineTo(x+26, y+10);
+    ctx.lineTo(x+24, y+22); ctx.lineTo(x+16, y+28);
+    ctx.lineTo(x+8, y+22); ctx.lineTo(x+6, y+10);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#4477ff';
+    ctx.beginPath();
+    ctx.moveTo(x+16, y+6); ctx.lineTo(x+24, y+11);
+    ctx.lineTo(x+22, y+20); ctx.lineTo(x+16, y+25);
+    ctx.lineTo(x+10, y+20); ctx.lineTo(x+8, y+11);
+    ctx.closePath(); ctx.fill();
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(x+14, y+10, 4, 14); ctx.fillRect(x+10, y+14, 12, 4);
+    ctx.shadowColor = '#4477ff'; ctx.shadowBlur = 10; ctx.fill(); ctx.shadowBlur = 0;
+  }
+  if (tile === T_RESPAWN) {
+    ctx.fillStyle = '#888'; ctx.fillRect(x+10, y+22, 12, 6);
+    ctx.fillStyle = '#22cc55';
+    ctx.beginPath(); ctx.arc(x+16, y+13, 10, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#88ffaa';
+    ctx.beginPath(); ctx.arc(x+13, y+10, 5, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#44ff88'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.arc(x+16, y+13, 10, 0, Math.PI*2); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.shadowColor = '#44ff88'; ctx.shadowBlur = 12;
+    ctx.beginPath(); ctx.arc(x+16, y+13, 10, 0, Math.PI*2); ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+  if (tile === T_BOMB_ITEM) {
+    ctx.fillStyle = '#888'; ctx.fillRect(x+10, y+22, 12, 6);
+    ctx.fillStyle = '#111';
+    ctx.beginPath(); ctx.arc(x+16, y+17, 9, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#333';
+    ctx.beginPath(); ctx.arc(x+14, y+14, 4, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.moveTo(x+22, y+10); ctx.lineTo(x+26, y+5); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.fillStyle = '#ff8800';
+    ctx.beginPath(); ctx.arc(x+26, y+4, 4, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#ffff00';
+    ctx.beginPath(); ctx.arc(x+26, y+4, 2, 0, Math.PI*2); ctx.fill();
+  }
+  if (tile === T_POTION) {
+    ctx.fillStyle = '#888'; ctx.fillRect(x+11, y+22, 10, 6);
+    ctx.fillStyle = '#666'; ctx.fillRect(x+14, y+5, 4, 5);
+    ctx.fillStyle = '#999'; ctx.fillRect(x+13, y+8, 6, 4);
+    ctx.fillStyle = '#aaddff'; ctx.fillRect(x+11, y+12, 10, 12);
+    ctx.fillStyle = '#88bbff'; ctx.fillRect(x+10, y+17, 12, 7);
+    ctx.fillStyle = '#ffffff88';
+    ctx.fillRect(x+12, y+13, 3, 8);
+    ctx.shadowColor = '#88bbff'; ctx.shadowBlur = 10;
+    ctx.fillStyle = '#aaddff'; ctx.fillRect(x+11, y+12, 10, 12);
+    ctx.shadowBlur = 0;
+  }
+}
+
+function drawMap() {
+  const layout = state.rooms[state.room];
+  for (let row=0; row<ROWS; row++) {
+    for (let col=0; col<COLS; col++) {
+      drawTile(layout[row][col], col, row);
+    }
+  }
+}
+
+function drawPlayer() {
+  const p = state.player;
+  if (p.invincible > 0 && Math.floor(p.invincible/4)%2===0) return;
+
+  const jh = p.jumpHeight || 0;
+  const px = p.x, py = p.y - jh;
+
+  const shadowAlpha = Math.max(0.05, 0.25 - jh * 0.008);
+  ctx.fillStyle = `rgba(0,0,0,${shadowAlpha})`;
+  ctx.beginPath();
+  ctx.ellipse(px+p.w/2, p.y+p.h+2, p.w/2 * (1 - jh/40), 5 * (1 - jh/40), 0, 0, Math.PI*2);
+  ctx.fill();
+
+  if (selectedCharacter === 'zelda') {
+    ctx.fillStyle = '#e060a0';
+    ctx.fillRect(px, py, p.w, p.h);
+    ctx.fillStyle = '#f080c0';
+    ctx.fillRect(px+3, py+3, p.w-6, 6);
+    ctx.fillStyle = '#e060a0';
+    ctx.fillRect(px-3, py+p.h-7, p.w+6, 7);
+    ctx.fillStyle = '#c8a020';
+    ctx.fillRect(px, py+2, 4, p.h-4);
+    ctx.fillRect(px+p.w-4, py+2, 4, p.h-4);
+    ctx.fillRect(px+2, py-3, p.w-4, 6);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(px+4, py-5, p.w-8, 3);
+    ctx.fillRect(px+5, py-9, 3, 5);
+    ctx.fillRect(px+p.w/2-2, py-10, 4, 6);
+    ctx.fillRect(px+p.w-8, py-9, 3, 5);
+    ctx.fillStyle = '#f5deb3';
+    const fx = px + (p.dir==='left' ? 5 : p.dir==='right' ? p.w-11 : 6);
+    const fy = py + 3;
+    ctx.fillRect(fx, fy, 8, 8);
+    ctx.fillStyle = '#000';
+    if (p.dir !== 'up') { ctx.fillRect(fx+1, fy+2, 2, 2); ctx.fillRect(fx+5, fy+2, 2, 2); }
+  } else {
+    ctx.fillStyle = '#22bb22';
+    ctx.fillRect(px, py, p.w, p.h);
+    ctx.fillStyle = '#55ee55';
+    ctx.fillRect(px+3, py+3, p.w-6, 6);
+    ctx.fillStyle = '#22bb22';
+    ctx.beginPath();
+    ctx.moveTo(px+2, py);
+    ctx.lineTo(px+p.w/2, py-10);
+    ctx.lineTo(px+p.w-2, py);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#f5deb3';
+    const fx = px + (p.dir==='left' ? 4 : p.dir==='right' ? p.w-10 : 6);
+    const fy = py + 3;
+    ctx.fillRect(fx, fy, 8, 8);
+    ctx.fillStyle = '#000';
+    if (p.dir !== 'up') { ctx.fillRect(fx+1, fy+2, 2, 2); ctx.fillRect(fx+5, fy+2, 2, 2); }
+  }
+
+  // Sword
+  if (p.attacking) {
+    const sw = getSwordRect(p);
+    const swy = sw.y - jh;
+    // Color based on sword tier
+    const sDef = getEquippedSwordDef();
+    const tier = sDef ? sDef.tier : 1;
+    ctx.fillStyle = tier === 3 ? '#88ddff' : tier === 2 ? '#aaa' : '#ccc';
+    ctx.fillRect(sw.x, swy, sw.w, sw.h);
+    ctx.fillStyle = '#888';
+    const isV = (p.dir==='up'||p.dir==='down');
+    if (isV) {
+      ctx.fillRect(sw.x-3, swy+(p.dir==='down'?0:sw.h-4), sw.w+6, 4);
+    } else {
+      ctx.fillRect(sw.x+(p.dir==='right'?0:sw.w-4), swy-3, 4, sw.h+6);
+    }
+    ctx.fillStyle = '#FFD700';
+    const tip = p.dir==='up' ? {x:sw.x+sw.w/2-2,y:swy} :
+                p.dir==='down' ? {x:sw.x+sw.w/2-2,y:swy+sw.h-4} :
+                p.dir==='left' ? {x:sw.x,y:swy+sw.h/2-2} :
+                                 {x:sw.x+sw.w-4,y:swy+sw.h/2-2};
+    ctx.fillRect(tip.x, tip.y, 4, 4);
+  }
+
+  // Shield
+  if (p.hasShield) {
+    const sh = { up: {x:px-6,y:py+4}, down: {x:px+p.w,y:py+4},
+                  left: {x:px+p.w,y:py+4}, right: {x:px-8,y:py+4} };
+    const s = sh[p.dir];
+    ctx.fillStyle = '#cc1111';
+    ctx.fillRect(s.x, s.y, 8, 12);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(s.x+2, s.y+1, 4, 4);
+  }
+}
+
+function drawEnemy(e) {
+  if (!e.alive) return;
+
+  const jh = e.jumpHeight || 0;
+  const drawY = e.y - jh;
+
+  // Shadow
+  const shadowScale = e.type === 'hopper' ? Math.max(0.3, 1 - jh/50) : 1;
+  ctx.fillStyle = 'rgba(0,0,0,0.2)';
+  ctx.beginPath();
+  ctx.ellipse(e.x+e.w/2, e.y+e.h+2, (e.w/2)*shadowScale, 5*shadowScale, 0, 0, Math.PI*2);
+  ctx.fill();
+
+  const flash = e.flashTimer > 0;
+
+  if (e.type === 'slime') {
+    ctx.fillStyle = flash ? '#fff' : '#7733cc';
+    ctx.beginPath();
+    ctx.ellipse(e.x+e.w/2, drawY+e.h/2+4, e.w/2, e.h/2-2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = flash ? '#ccc' : '#5511aa';
+    ctx.beginPath();
+    ctx.ellipse(e.x+e.w/2, drawY+e.h/2, e.w/2-2, e.h/2-4, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#fff';
+    ctx.fillRect(e.x+6, drawY+8, 4, 5);
+    ctx.fillRect(e.x+14, drawY+8, 4, 5);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(e.x+7, drawY+9, 2, 3);
+    ctx.fillRect(e.x+15, drawY+9, 2, 3);
+  } else if (e.type === 'hopper') {
+    // Green frog-like body
+    ctx.fillStyle = flash ? '#fff' : '#22aa44';
+    ctx.beginPath();
+    ctx.ellipse(e.x+e.w/2, drawY+e.h/2+2, e.w/2+2, e.h/2, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = flash ? '#ddd' : '#118833';
+    ctx.beginPath();
+    ctx.ellipse(e.x+e.w/2, drawY+e.h/2-1, e.w/2-1, e.h/2-3, 0, 0, Math.PI*2);
+    ctx.fill();
+    // Big eyes
+    ctx.fillStyle = '#fff';
+    ctx.beginPath(); ctx.arc(e.x+5, drawY+5, 5, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e.x+e.w-5, drawY+5, 5, 0, Math.PI*2); ctx.fill();
+    ctx.fillStyle = '#000';
+    ctx.beginPath(); ctx.arc(e.x+6, drawY+6, 2, 0, Math.PI*2); ctx.fill();
+    ctx.beginPath(); ctx.arc(e.x+e.w-6, drawY+6, 2, 0, Math.PI*2); ctx.fill();
+  } else if (e.type === 'guard') {
+    ctx.fillStyle = flash ? '#fff' : '#cc3300';
+    ctx.fillRect(e.x, drawY, e.w, e.h);
+    ctx.fillStyle = flash ? '#ccc' : '#aa2200';
+    ctx.fillRect(e.x+2, drawY+2, e.w-4, e.h/2);
+    ctx.fillStyle = '#888';
+    ctx.fillRect(e.x, drawY-4, e.w, 8);
+    ctx.fillStyle = '#aaa';
+    ctx.fillRect(e.x+4, drawY-3, e.w-8, 5);
+
+    // Guard melee sword during attack
+    if (e.isAttacking) {
+      const esw = getEnemySwordRect(e);
+      ctx.fillStyle = '#999';
+      ctx.fillRect(esw.x, esw.y - jh, esw.w, esw.h);
+    } else {
+      // Spear (default appearance)
+      ctx.fillStyle = '#888';
+      ctx.fillRect(e.x+e.w, drawY-8, 3, e.h+12);
+      ctx.fillStyle = '#ccc';
+      ctx.beginPath();
+      ctx.moveTo(e.x+e.w+1, drawY-8);
+      ctx.lineTo(e.x+e.w+6, drawY-16);
+      ctx.lineTo(e.x+e.w+3, drawY-8);
+      ctx.fill();
+    }
+  } else if (e.type === 'boss') {
+    ctx.fillStyle = flash ? '#fff' : '#cc0000';
+    ctx.fillRect(e.x, drawY, e.w, e.h);
+    ctx.fillStyle = flash ? '#faa' : '#880000';
+    ctx.fillRect(e.x+4, drawY+4, e.w-8, e.h-8);
+    ctx.fillStyle = flash ? '#fff' : '#ff6600';
+    ctx.beginPath();
+    ctx.moveTo(e.x+8, drawY);
+    ctx.lineTo(e.x+4, drawY-12);
+    ctx.lineTo(e.x+14, drawY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(e.x+e.w-8, drawY);
+    ctx.lineTo(e.x+e.w-4, drawY-12);
+    ctx.lineTo(e.x+e.w-14, drawY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#FFD700';
+    ctx.fillRect(e.x+8, drawY+10, 6, 6);
+    ctx.fillRect(e.x+e.w-14, drawY+10, 6, 6);
+    ctx.fillStyle = '#000';
+    ctx.fillRect(e.x+10, drawY+12, 3, 3);
+    ctx.fillRect(e.x+e.w-12, drawY+12, 3, 3);
+    // HP bar
+    ctx.fillStyle = '#333';
+    ctx.fillRect(e.x, drawY-12, e.w, 6);
+    ctx.fillStyle = '#f00';
+    ctx.fillRect(e.x, drawY-12, (e.hp/e.maxHp)*e.w, 6);
+    ctx.fillStyle = '#f55';
+    ctx.fillRect(e.x, drawY-12, (e.hp/e.maxHp)*e.w, 2);
+  } else if (e.type === 'shadow_dragon') {
+    // Shadowy aura
+    ctx.fillStyle = 'rgba(80, 0, 120, 0.3)';
+    ctx.beginPath();
+    ctx.arc(e.x+e.w/2, drawY+e.h/2, e.w/2+10, 0, Math.PI*2);
+    ctx.fill();
+    // Dark purple/black body
+    ctx.fillStyle = flash ? '#fff' : '#2a0033';
+    ctx.fillRect(e.x, drawY, e.w, e.h);
+    ctx.fillStyle = flash ? '#dda' : '#110018';
+    ctx.fillRect(e.x+4, drawY+4, e.w-8, e.h-8);
+    // Dark horns
+    ctx.fillStyle = flash ? '#fff' : '#660066';
+    ctx.beginPath();
+    ctx.moveTo(e.x+10, drawY);
+    ctx.lineTo(e.x+4, drawY-14);
+    ctx.lineTo(e.x+16, drawY);
+    ctx.closePath();
+    ctx.fill();
+    ctx.beginPath();
+    ctx.moveTo(e.x+e.w-10, drawY);
+    ctx.lineTo(e.x+e.w-4, drawY-14);
+    ctx.lineTo(e.x+e.w-16, drawY);
+    ctx.closePath();
+    ctx.fill();
+    // Glowing red eyes
+    ctx.shadowColor = '#ff0000';
+    ctx.shadowBlur = 8;
+    ctx.fillStyle = '#ff0000';
+    ctx.fillRect(e.x+10, drawY+12, 7, 7);
+    ctx.fillRect(e.x+e.w-17, drawY+12, 7, 7);
+    ctx.shadowBlur = 0;
+    // Eye pupils
+    ctx.fillStyle = '#000';
+    ctx.fillRect(e.x+12, drawY+14, 3, 3);
+    ctx.fillRect(e.x+e.w-15, drawY+14, 3, 3);
+    // HP bar (purple tint)
+    ctx.fillStyle = '#333';
+    ctx.fillRect(e.x, drawY-12, e.w, 6);
+    ctx.fillStyle = '#9900cc';
+    ctx.fillRect(e.x, drawY-12, (e.hp/e.maxHp)*e.w, 6);
+    ctx.fillStyle = '#cc44ff';
+    ctx.fillRect(e.x, drawY-12, (e.hp/e.maxHp)*e.w, 2);
+  }
+
+  // HP bar for non-boss
+  if (e.type !== 'boss' && e.type !== 'shadow_dragon') {
+    ctx.fillStyle = '#333';
+    ctx.fillRect(e.x, drawY-8, e.w, 4);
+    const barColor = e.type === 'guard' ? '#f80' : e.type === 'hopper' ? '#4c4' : '#a0f';
+    ctx.fillStyle = barColor;
+    ctx.fillRect(e.x, drawY-8, (e.hp/e.maxHp)*e.w, 4);
+  }
+}
+
+function drawRupees() {
+  for (const r of state.rupees) {
+    if (r.collected) continue;
+    const now = Date.now();
+    const bob = Math.sin(now*0.004 + r.x) * 2;
+    ctx.fillStyle = '#00aaff';
+    ctx.beginPath();
+    ctx.moveTo(r.x, r.y+bob-6);
+    ctx.lineTo(r.x-5, r.y+bob);
+    ctx.lineTo(r.x, r.y+bob+6);
+    ctx.lineTo(r.x+5, r.y+bob);
+    ctx.closePath();
+    ctx.fill();
+    ctx.fillStyle = '#88ddff';
+    ctx.beginPath();
+    ctx.moveTo(r.x, r.y+bob-3);
+    ctx.lineTo(r.x-2, r.y+bob);
+    ctx.lineTo(r.x, r.y+bob+3);
+    ctx.lineTo(r.x+2, r.y+bob);
+    ctx.closePath();
+    ctx.fill();
+  }
+}
+
+function drawGroundItems() {
+  const now = Date.now();
+  for (const gi of state.groundItems) {
+    if (gi.roomIdx !== state.room) continue;
+    const bob = Math.sin(now * 0.004 + gi.x + gi.y) * 3;
+    const def = ITEM_DEFS[gi.type];
+    if (!def) continue;
+    // Fade out in last 2 seconds
+    const alpha = gi.lifetime < 300 ? gi.lifetime / 300 : 1; // fade out in last 5 seconds
+    ctx.globalAlpha = alpha;
+    ctx.font = '18px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(def.icon, gi.x, gi.y + bob);
+    if (gi.count > 1) {
+      ctx.font = 'bold 10px Courier New';
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText('x' + gi.count, gi.x + 10, gi.y + bob + 8);
+    }
+    ctx.globalAlpha = 1;
+    ctx.textAlign = 'left';
+  }
+}
+
+function drawEnemyArrows() {
+  for (const a of state.enemyArrows) {
+    if (!a.alive) continue;
+    // Red-tinted arrow
+    ctx.fillStyle = '#cc2222';
+    const isV = Math.abs(a.vy) > Math.abs(a.vx);
+    if (isV) ctx.fillRect(a.x+2, a.y, 4, 10);
+    else     ctx.fillRect(a.x, a.y+2, 10, 4);
+    // Red arrowhead
+    ctx.fillStyle = '#ff4444';
+    if (a.vy < 0) { ctx.beginPath(); ctx.moveTo(a.x+4,a.y-2); ctx.lineTo(a.x+1,a.y+3); ctx.lineTo(a.x+7,a.y+3); ctx.fill(); }
+    if (a.vy > 0) { ctx.beginPath(); ctx.moveTo(a.x+4,a.y+12); ctx.lineTo(a.x+1,a.y+7); ctx.lineTo(a.x+7,a.y+7); ctx.fill(); }
+    if (a.vx < 0) { ctx.beginPath(); ctx.moveTo(a.x-2,a.y+4); ctx.lineTo(a.x+3,a.y+1); ctx.lineTo(a.x+3,a.y+7); ctx.fill(); }
+    if (a.vx > 0) { ctx.beginPath(); ctx.moveTo(a.x+12,a.y+4); ctx.lineTo(a.x+7,a.y+1); ctx.lineTo(a.x+7,a.y+7); ctx.fill(); }
+  }
+}
+
+function drawParticles() {
+  for (const pt of state.particles) {
+    const alpha = pt.life / pt.maxLife;
+    ctx.globalAlpha = alpha;
+    ctx.fillStyle = pt.color;
+    ctx.beginPath();
+    ctx.arc(pt.x, pt.y, pt.r * alpha, 0, Math.PI*2);
+    ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+}
+
+function drawHint() {
+  const r = state.room;
+  if (r >= 9) return; // side rooms
+  ctx.font = '13px Courier New';
+  ctx.textAlign = 'center';
+  if (!state.doorOpen && state.enemies.some(e => e.alive)) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(W/2-120, H-36, 240, 22);
+    ctx.fillStyle = '#FFD700';
+    ctx.fillText('Defeat all enemies to open the door!', W/2, H-19);
+  } else if (state.doorOpen && r < TOTAL_ROOMS - 1) {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)';
+    ctx.fillRect(W/2-100, H-36, 200, 22);
+    ctx.fillStyle = '#00ff88';
+    ctx.fillText('Door open! Head north!', W/2, H-19);
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawTransition() {
+  const info = ROOM_INFO[state.transitionRoom];
+  const alpha = Math.min(0.85, 1 - state.transitionTimer / 600 * 0.3);
+  ctx.fillStyle = `rgba(0,0,0,${alpha})`;
+  ctx.fillRect(0, 0, W, H);
+
+  const displayRoom = state.transitionRoom === 0 ? 1 : state.transitionRoom;
+  ctx.fillStyle = '#FFD700';
+  ctx.font = 'bold 14px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillText(`— ROOM ${displayRoom} OF 8 —`, W/2, H/2 - 48);
+
+  ctx.font = 'bold 30px Courier New';
+  ctx.fillStyle = '#fff';
+  ctx.fillText(info ? info.name : `Room ${displayRoom}`, W/2, H/2 - 10);
+
+  ctx.font = '16px Courier New';
+  ctx.fillStyle = '#aaa';
+  ctx.fillText(info ? info.desc : '', W/2, H/2 + 28);
+
+  const blink = state.transitionTimer < 60 && Math.floor(state.transitionTimer / 15) % 2 === 0;
+  if (blink || state.transitionTimer >= 60) {
+    ctx.fillStyle = state.transitionTimer < 300 ? '#FFD700' : '#555';
+    ctx.font = '13px Courier New';
+    ctx.fillText('Press any key to continue...', W/2, H/2 + 72);
+  }
+
+  ctx.textAlign = 'left';
+}
+
+function drawBombs() {
+  for (const b of state.bombEntities) {
+    if (!b.alive) continue;
+    ctx.fillStyle = 'rgba(0,0,0,0.3)';
+    ctx.beginPath();
+    ctx.ellipse(b.x+TILE/2, b.y+TILE-4, 10, 5, 0, 0, Math.PI*2);
+    ctx.fill();
+    ctx.fillStyle = '#111';
+    ctx.beginPath();
+    ctx.arc(b.x+TILE/2, b.y+TILE/2, 10, 0, Math.PI*2);
+    ctx.fill();
+    const blinkRate = b.timer < 60 ? 3 : 10;
+    if (Math.floor(b.timer / blinkRate) % 2 === 0) {
+      ctx.fillStyle = b.timer < 60 ? '#ff2200' : '#ff8800';
+      ctx.beginPath();
+      ctx.arc(b.x + TILE/2 + 6, b.y + TILE/2 - 8, 4, 0, Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle = '#333';
+    ctx.fillRect(b.x, b.y - 8, TILE, 4);
+    ctx.fillStyle = b.timer < 60 ? '#f00' : '#fa0';
+    ctx.fillRect(b.x, b.y - 8, (b.timer/180)*TILE, 4);
+  }
+}
+
+function drawArrows() {
+  for (const a of state.arrows) {
+    if (!a.alive) continue;
+    ctx.fillStyle = '#c8a020';
+    const isV = a.vy !== 0;
+    if (isV) ctx.fillRect(a.x+2, a.y, 4, 10);
+    else     ctx.fillRect(a.x, a.y+2, 10, 4);
+    ctx.fillStyle = '#fff';
+    if (a.vy < 0) { ctx.beginPath(); ctx.moveTo(a.x+4,a.y-2); ctx.lineTo(a.x+1,a.y+3); ctx.lineTo(a.x+7,a.y+3); ctx.fill(); }
+    if (a.vy > 0) { ctx.beginPath(); ctx.moveTo(a.x+4,a.y+12); ctx.lineTo(a.x+1,a.y+7); ctx.lineTo(a.x+7,a.y+7); ctx.fill(); }
+    if (a.vx < 0) { ctx.beginPath(); ctx.moveTo(a.x-2,a.y+4); ctx.lineTo(a.x+3,a.y+1); ctx.lineTo(a.x+3,a.y+7); ctx.fill(); }
+    if (a.vx > 0) { ctx.beginPath(); ctx.moveTo(a.x+12,a.y+4); ctx.lineTo(a.x+7,a.y+1); ctx.lineTo(a.x+7,a.y+7); ctx.fill(); }
+  }
+}
+
+function drawShrineHint() {
+  if (state.room !== 0 || state.weaponChosen) return;
+  const p = state.player;
+  if (p.x > 10 * TILE) {
+    ctx.fillStyle = 'rgba(0,0,0,0.6)';
+    ctx.fillRect(W/2-160, H/2-56, 320, 52);
+    ctx.fillStyle = '#FFD700';
+    ctx.font = 'bold 15px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('Choose your weapon', W/2, H/2-34);
+    ctx.fillStyle = '#e55';
+    ctx.font = '13px Courier New';
+    ctx.fillText('You can only choose one!', W/2, H/2-14);
+    ctx.textAlign = 'left';
+  }
+}
+
+const ITEM_TILE_LABELS = {
+  [T_SWORD]:     'SWORD',
+  [T_BOW]:       'BOW',
+  [T_SHIELD]:    'SHIELD',
+  [T_RESPAWN]:   'RESPAWN',
+  [T_BOMB_ITEM]: 'BOMB x3',
+  [T_POTION]:    'POTION',
+  [T_TRIFORCE]:  'TRIFORCE',
+};
+
+function drawItemLabels() {
+  const layout = state.rooms[state.room];
+  ctx.font = 'bold 10px Courier New';
+  ctx.textAlign = 'center';
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const label = ITEM_TILE_LABELS[layout[row][col]];
+      if (!label) continue;
+      const x = col * TILE + TILE / 2;
+      const y = row * TILE - 4;
+      const tw = ctx.measureText(label).width;
+      ctx.fillStyle = 'rgba(0,0,0,0.7)';
+      ctx.beginPath();
+      ctx.roundRect(x - tw/2 - 4, y - 11, tw + 8, 13, 3);
+      ctx.fill();
+      ctx.fillStyle = '#FFD700';
+      ctx.fillText(label, x, y);
+    }
+  }
+  ctx.textAlign = 'left';
+}
+
+function drawBowCooldown() {
+  const bowDef = getEquippedBowDef();
+  if (!bowDef) return;
+  const p = state.player;
+  const maxCD = bowDef.cooldown;
+  const ready = p.bowCooldown === 0;
+  const fill = ready ? 1 : (maxCD - p.bowCooldown) / maxCD;
+  const bx = 8, by = 50, bw = 80, bh = 7;
+  ctx.fillStyle = 'rgba(0,0,0,0.55)';
+  ctx.fillRect(bx - 1, by - 1, bw + 2, bh + 2);
+  ctx.fillStyle = ready ? '#44ff88' : '#ffaa00';
+  ctx.fillRect(bx, by, Math.round(bw * fill), bh);
+  ctx.font = 'bold 9px Courier New';
+  ctx.textAlign = 'left';
+  ctx.fillStyle = ready ? '#44ff88' : '#ffaa00';
+  ctx.fillText(ready ? 'BOW READY' : 'BOW CHARGING', bx, by - 3);
+}
+
+// ─── PHASE 4: Full Inventory Screen ──────────────────────────
+function drawInventoryScreen() {
+  // Dark overlay
+  ctx.fillStyle = 'rgba(0,0,0,0.85)';
+  ctx.fillRect(0, 0, W, H);
+
+  const slotSize = 40;
+  const margin = 4;
+  const hotbarCols = 8;
+  const bagCols = 6;
+  const bagRows = 3;
+
+  // Title
+  ctx.font = 'bold 24px Courier New';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#FFD700';
+  ctx.fillText('INVENTORY', W/2, 40);
+
+  // Hotbar
+  const hotbarStartX = W/2 - ((hotbarCols * (slotSize + margin)) / 2);
+  const hotbarY = 60;
+
+  ctx.font = 'bold 10px Courier New';
+  ctx.fillStyle = '#888';
+  ctx.fillText('HOTBAR', W/2, hotbarY - 4);
+
+  for (let i = 0; i < hotbarCols; i++) {
+    const sx = hotbarStartX + i * (slotSize + margin);
+    const sy = hotbarY;
+    const item = state.inventory.slots[i];
+    const def = item ? ITEM_DEFS[item.type] : null;
+    const isCursor = state.invScreenCursor === i;
+    const isSelected = state.invScreenSelected === i;
+
+    // Slot bg
+    ctx.fillStyle = isSelected ? '#2e2400' : '#1a1a1a';
+    ctx.fillRect(sx, sy, slotSize, slotSize);
+
+    // Border
+    if (isSelected) {
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 3;
+    } else if (isCursor) {
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 2;
+    } else if (def && def.tier === 3) {
+      ctx.strokeStyle = '#FFD700';
+      ctx.lineWidth = 2;
+    } else if (def && def.tier === 2) {
+      ctx.strokeStyle = '#4488ff';
+      ctx.lineWidth = 2;
+    } else {
+      ctx.strokeStyle = '#444';
+      ctx.lineWidth = 1;
+    }
+    ctx.strokeRect(sx, sy, slotSize, slotSize);
+    ctx.lineWidth = 1;
+
+    // Item
+    if (def) {
+      ctx.font = '20px sans-serif';
+      ctx.textAlign = 'center';
+      ctx.fillText(def.icon, sx + slotSize/2, sy + slotSize/2 + 6);
+      if (item.count > 1) {
+        ctx.font = 'bold 9px Courier New';
+        ctx.fillStyle = '#FFD700';
+        ctx.fillText('x' + item.count, sx + slotSize - 8, sy + slotSize - 4);
+      }
+    }
+
+    // Slot label (1-8)
+    ctx.font = '8px Courier New';
+    ctx.fillStyle = '#555';
+    ctx.textAlign = 'center';
+    ctx.fillText(i < 2 ? (i === 0 ? 'Z' : 'X') : (i+1)+'', sx + slotSize/2, sy + 8);
+  }
+
+  // Divider
+  const divY = hotbarY + slotSize + 12;
+  ctx.fillStyle = '#333';
+  ctx.fillRect(hotbarStartX, divY, hotbarCols * (slotSize + margin), 1);
+
+  // Bag
+  const bagStartX = W/2 - ((bagCols * (slotSize + margin)) / 2);
+  const bagStartY = divY + 16;
+
+  ctx.font = 'bold 10px Courier New';
+  ctx.fillStyle = '#888';
+  ctx.textAlign = 'center';
+  ctx.fillText('BAG', W/2, bagStartY - 4);
+
+  for (let row = 0; row < bagRows; row++) {
+    for (let col = 0; col < bagCols; col++) {
+      const bagIdx = row * bagCols + col;
+      const unifiedIdx = 8 + bagIdx;
+      const sx = bagStartX + col * (slotSize + margin);
+      const sy = bagStartY + row * (slotSize + margin);
+      const item = state.inventory.bag[bagIdx];
+      const def = item ? ITEM_DEFS[item.type] : null;
+      const isCursor = state.invScreenCursor === unifiedIdx;
+      const isSelected = state.invScreenSelected === unifiedIdx;
+
+      ctx.fillStyle = isSelected ? '#2e2400' : '#1a1a1a';
+      ctx.fillRect(sx, sy, slotSize, slotSize);
+
+      if (isSelected) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 3;
+      } else if (isCursor) {
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+      } else if (def && def.tier === 3) {
+        ctx.strokeStyle = '#FFD700';
+        ctx.lineWidth = 2;
+      } else if (def && def.tier === 2) {
+        ctx.strokeStyle = '#4488ff';
+        ctx.lineWidth = 2;
+      } else {
+        ctx.strokeStyle = '#444';
+        ctx.lineWidth = 1;
+      }
+      ctx.strokeRect(sx, sy, slotSize, slotSize);
+      ctx.lineWidth = 1;
+
+      if (def) {
+        ctx.font = '20px sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillText(def.icon, sx + slotSize/2, sy + slotSize/2 + 6);
+        if (item.count > 1) {
+          ctx.font = 'bold 9px Courier New';
+          ctx.fillStyle = '#FFD700';
+          ctx.fillText('x' + item.count, sx + slotSize - 8, sy + slotSize - 4);
+        }
+      }
+    }
+  }
+
+  // Tooltip for cursor item
+  const curItem = getUnifiedSlot(state.invScreenCursor);
+  if (curItem) {
+    const def = ITEM_DEFS[curItem.type];
+    if (def) {
+      const tooltipY = bagStartY + bagRows * (slotSize + margin) + 16;
+      ctx.fillStyle = 'rgba(0,0,0,0.8)';
+      ctx.fillRect(W/2 - 150, tooltipY, 300, 60);
+      ctx.strokeStyle = '#555';
+      ctx.strokeRect(W/2 - 150, tooltipY, 300, 60);
+
+      ctx.font = 'bold 14px Courier New';
+      ctx.fillStyle = def.tier === 3 ? '#FFD700' : def.tier === 2 ? '#4488ff' : '#fff';
+      ctx.textAlign = 'center';
+      ctx.fillText(def.name + (def.tier > 0 ? ' (T' + def.tier + ')' : ''), W/2, tooltipY + 18);
+
+      ctx.font = '11px Courier New';
+      ctx.fillStyle = '#aaa';
+      let stats = '';
+      if (def.dmg) stats += 'DMG: ' + def.dmg + '  ';
+      if (def.arrowDmg) stats += 'Arrow DMG: ' + def.arrowDmg + '  ';
+      if (def.cooldown) stats += 'CD: ' + def.cooldown + '  ';
+      if (def.durability) stats += 'Dur: ' + (curItem.count || def.durability) + '/' + def.durability;
+      if (def.attackDur) stats += 'Speed: ' + def.attackDur;
+      if (stats) ctx.fillText(stats, W/2, tooltipY + 36);
+      ctx.fillText(def.category, W/2, tooltipY + 50);
+    }
+  }
+
+  // Controls hint
+  const hintY = H - 30;
+  ctx.font = '11px Courier New';
+  ctx.fillStyle = '#555';
+  ctx.textAlign = 'center';
+  ctx.fillText('E: Close  |  Arrows: Navigate  |  Enter: Select/Swap  |  C: Drop  |  Esc: Cancel', W/2, hintY);
+  ctx.textAlign = 'left';
+}
+
+function render() {
+  ctx.clearRect(0, 0, W, H);
+  drawMap();
+  drawItemLabels();
+  drawRupees();
+  drawGroundItems();
+  drawBombs();
+  drawArrows();
+  drawEnemyArrows();
+  drawParticles();
+  for (const e of state.enemies) drawEnemy(e);
+  drawPlayer();
+  drawShrineHint();
+  drawBowCooldown();
+  drawHint();
+  if (state.transitioning) drawTransition();
+
+  // Inventory screen replaces pause overlay when open
+  if (state.inventoryScreenOpen) {
+    drawInventoryScreen();
+  } else if (state.paused && !state.over && !state.won) {
+    ctx.fillStyle = 'rgba(0,0,0,0.55)';
+    ctx.fillRect(0, 0, W, H);
+    ctx.fillStyle = 'rgba(0,0,0,0.8)';
+    ctx.beginPath(); ctx.roundRect(W/2-90, H/2-40, 180, 80, 8); ctx.fill();
+    ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 2;
+    ctx.beginPath(); ctx.roundRect(W/2-90, H/2-40, 180, 80, 8); ctx.stroke();
+    ctx.lineWidth = 1;
+    ctx.font = 'bold 26px Courier New'; ctx.textAlign = 'center'; ctx.fillStyle = '#FFD700';
+    ctx.fillText('PAUSED', W/2, H/2);
+    ctx.font = '13px Courier New'; ctx.fillStyle = '#aaa';
+    ctx.fillText('Press ESC or P to resume', W/2, H/2 + 24);
+    ctx.textAlign = 'left';
+  }
+}
+
+// ─── Game Loop ────────────────────────────────────────────────
+function loop() {
+  try {
+    update();
+    render();
+  } catch(err) {
+    console.error('Game error:', err);
+  }
+  requestAnimationFrame(loop);
+}
+
+// ─── Home / Index screens ─────────────────────────────────────
+function showHome() {
+  state.paused = true;
+  document.getElementById('homeScreen').style.display = 'flex';
+}
+
+function startGame() {
+  document.getElementById('homeScreen').style.display = 'none';
+  restartGame();
+  state.transitioning = true;
+  state.transitionTimer = 600;
+  state.transitionRoom = 0;
+  state.keys = {};
+  state.paused = false;
+}
+
+function showEnemyIndex() {
+  state.paused = true;
+  document.getElementById('homeScreen').style.display = 'none';
+  document.getElementById('enemyIndex').style.display = 'flex';
+  drawEnemyPreviews();
+}
+
+function closeEnemyIndex() {
+  document.getElementById('enemyIndex').style.display = 'none';
+  document.getElementById('homeScreen').style.display = 'flex';
+}
+
+function drawEnemyPreviews() {
+  // Slime preview
+  const sc = document.getElementById('slimePreview').getContext('2d');
+  sc.clearRect(0,0,48,48);
+  sc.fillStyle = '#7733cc';
+  sc.beginPath(); sc.ellipse(24, 30, 18, 14, 0, 0, Math.PI*2); sc.fill();
+  sc.fillStyle = '#5511aa';
+  sc.beginPath(); sc.ellipse(24, 24, 16, 12, 0, 0, Math.PI*2); sc.fill();
+  sc.fillStyle = '#fff';
+  sc.fillRect(14, 16, 6, 8); sc.fillRect(26, 16, 6, 8);
+  sc.fillStyle = '#000';
+  sc.fillRect(16, 18, 3, 5); sc.fillRect(28, 18, 3, 5);
+
+  // Guard preview
+  const gc = document.getElementById('guardPreview').getContext('2d');
+  gc.clearRect(0,0,48,48);
+  gc.fillStyle = '#cc3300';
+  gc.fillRect(12, 16, 24, 24);
+  gc.fillStyle = '#aa2200';
+  gc.fillRect(14, 18, 20, 10);
+  gc.fillStyle = '#888';
+  gc.fillRect(12, 8, 24, 12);
+  gc.fillStyle = '#aaa';
+  gc.fillRect(16, 9, 16, 8);
+  gc.fillStyle = '#888';
+  gc.fillRect(36, 4, 4, 36);
+  gc.fillStyle = '#ccc';
+  gc.beginPath(); gc.moveTo(37,4); gc.lineTo(42,-4); gc.lineTo(40,4); gc.fill();
+
+  // Hopper preview
+  const hc = document.getElementById('hopperPreview').getContext('2d');
+  hc.clearRect(0,0,48,48);
+  hc.fillStyle = '#22aa44';
+  hc.beginPath(); hc.ellipse(24, 30, 16, 12, 0, 0, Math.PI*2); hc.fill();
+  hc.fillStyle = '#118833';
+  hc.beginPath(); hc.ellipse(24, 27, 14, 10, 0, 0, Math.PI*2); hc.fill();
+  hc.fillStyle = '#fff';
+  hc.beginPath(); hc.arc(16, 20, 6, 0, Math.PI*2); hc.fill();
+  hc.beginPath(); hc.arc(32, 20, 6, 0, Math.PI*2); hc.fill();
+  hc.fillStyle = '#000';
+  hc.beginPath(); hc.arc(17, 21, 3, 0, Math.PI*2); hc.fill();
+  hc.beginPath(); hc.arc(31, 21, 3, 0, Math.PI*2); hc.fill();
+
+  // Boss preview
+  const bc = document.getElementById('bossPreview').getContext('2d');
+  bc.clearRect(0,0,64,64);
+  bc.fillStyle = '#cc0000';
+  bc.fillRect(12, 18, 40, 36);
+  bc.fillStyle = '#880000';
+  bc.fillRect(16, 22, 32, 28);
+  bc.fillStyle = '#ff6600';
+  bc.beginPath(); bc.moveTo(18,18); bc.lineTo(10,4); bc.lineTo(26,18); bc.closePath(); bc.fill();
+  bc.beginPath(); bc.moveTo(46,18); bc.lineTo(54,4); bc.lineTo(38,18); bc.closePath(); bc.fill();
+  bc.fillStyle = '#FFD700';
+  bc.fillRect(18, 26, 8, 8); bc.fillRect(38, 26, 8, 8);
+  bc.fillStyle = '#000';
+  bc.fillRect(21, 28, 4, 5); bc.fillRect(41, 28, 4, 5);
+
+  // Shadow Dragon preview
+  const sd = document.getElementById('shadowDragonPreview').getContext('2d');
+  sd.clearRect(0,0,64,64);
+  // Aura
+  sd.fillStyle = 'rgba(80, 0, 120, 0.3)';
+  sd.beginPath(); sd.arc(32, 38, 30, 0, Math.PI*2); sd.fill();
+  // Body
+  sd.fillStyle = '#2a0033';
+  sd.fillRect(10, 18, 44, 38);
+  sd.fillStyle = '#110018';
+  sd.fillRect(14, 22, 36, 30);
+  // Horns
+  sd.fillStyle = '#660066';
+  sd.beginPath(); sd.moveTo(18,18); sd.lineTo(10,4); sd.lineTo(26,18); sd.closePath(); sd.fill();
+  sd.beginPath(); sd.moveTo(46,18); sd.lineTo(54,4); sd.lineTo(38,18); sd.closePath(); sd.fill();
+  // Glowing red eyes
+  sd.shadowColor = '#ff0000';
+  sd.shadowBlur = 8;
+  sd.fillStyle = '#ff0000';
+  sd.fillRect(18, 28, 8, 8); sd.fillRect(38, 28, 8, 8);
+  sd.shadowBlur = 0;
+  sd.fillStyle = '#000';
+  sd.fillRect(21, 30, 4, 4); sd.fillRect(41, 30, 4, 4);
+}
+
+// ─── Touch Controls ──────────────────────────────────────────
+(function initTouchControls() {
+  const dpad = document.getElementById('dpad');
+  const btnAttack = document.getElementById('btnAttack');
+  const btnSlot2 = document.getElementById('btnSlot2');
+  const btnInv = document.getElementById('btnInv');
+  const btnDrop = document.getElementById('btnDrop');
+  if (!dpad) return;
+
+  // Prevent default on all touch elements to avoid scrolling/zooming
+  document.getElementById('touchControls').addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  document.getElementById('touchControls').addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchstart', e => e.preventDefault(), { passive: false });
+  canvas.addEventListener('touchmove', e => e.preventDefault(), { passive: false });
+
+  // ── D-pad ──
+  let dpadTouchId = null;
+  const dpadKeys = { up: 'KeyW', down: 'KeyS', left: 'KeyA', right: 'KeyD' };
+  const dpadEls = {
+    up: document.getElementById('dpadUp'),
+    down: document.getElementById('dpadDown'),
+    left: document.getElementById('dpadLeft'),
+    right: document.getElementById('dpadRight'),
+  };
+
+  function clearDpad() {
+    for (const dir in dpadKeys) {
+      state.keys[dpadKeys[dir]] = false;
+      dpadEls[dir].classList.remove('active');
+    }
+    // Also clear arrow keys for inventory navigation
+    if (state.inventoryScreenOpen) {
+      // arrows cleared via synthetic events
+    }
+  }
+
+  function updateDpad(touch) {
+    const rect = dpad.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const dx = touch.clientX - cx;
+    const dy = touch.clientY - cy;
+    const dist = Math.sqrt(dx * dx + dy * dy);
+
+    clearDpad();
+    if (dist < 10) return; // dead zone
+
+    const angle = Math.atan2(dy, dx);
+    // Map angle to 4 directions
+    if (state.inventoryScreenOpen) {
+      // In inventory screen, d-pad fires arrow key events
+      let code = null;
+      if (angle > -Math.PI * 0.75 && angle <= -Math.PI * 0.25) code = 'ArrowUp';
+      else if (angle > Math.PI * 0.25 && angle <= Math.PI * 0.75) code = 'ArrowDown';
+      else if (Math.abs(angle) > Math.PI * 0.75) code = 'ArrowLeft';
+      else code = 'ArrowRight';
+      document.dispatchEvent(new KeyboardEvent('keydown', { code }));
+    } else {
+      // Normal gameplay: set WASD keys
+      if (angle > -Math.PI * 0.75 && angle <= -Math.PI * 0.25) {
+        state.keys[dpadKeys.up] = true; dpadEls.up.classList.add('active');
+      } else if (angle > Math.PI * 0.25 && angle <= Math.PI * 0.75) {
+        state.keys[dpadKeys.down] = true; dpadEls.down.classList.add('active');
+      } else if (Math.abs(angle) > Math.PI * 0.75) {
+        state.keys[dpadKeys.left] = true; dpadEls.left.classList.add('active');
+      } else {
+        state.keys[dpadKeys.right] = true; dpadEls.right.classList.add('active');
+      }
+    }
+  }
+
+  dpad.addEventListener('touchstart', e => {
+    e.preventDefault();
+    const touch = e.changedTouches[0];
+    dpadTouchId = touch.identifier;
+    updateDpad(touch);
+  }, { passive: false });
+
+  dpad.addEventListener('touchmove', e => {
+    e.preventDefault();
+    for (const touch of e.changedTouches) {
+      if (touch.identifier === dpadTouchId) updateDpad(touch);
+    }
+  }, { passive: false });
+
+  dpad.addEventListener('touchend', e => {
+    for (const touch of e.changedTouches) {
+      if (touch.identifier === dpadTouchId) {
+        dpadTouchId = null;
+        clearDpad();
+      }
+    }
+  });
+
+  dpad.addEventListener('touchcancel', () => { dpadTouchId = null; clearDpad(); });
+
+  // ── Action buttons ──
+  function bindActionBtn(el, keyCode, isToggle) {
+    el.addEventListener('touchstart', e => {
+      e.preventDefault();
+      el.classList.add('active');
+      if (isToggle) {
+        // Fire a single keydown event (for E and C which have special handlers)
+        document.dispatchEvent(new KeyboardEvent('keydown', { code: keyCode }));
+      } else {
+        state.keys[keyCode] = true;
+      }
+    }, { passive: false });
+
+    el.addEventListener('touchend', e => {
+      e.preventDefault();
+      el.classList.remove('active');
+      if (isToggle) {
+        document.dispatchEvent(new KeyboardEvent('keyup', { code: keyCode }));
+      } else {
+        state.keys[keyCode] = false;
+      }
+    });
+
+    el.addEventListener('touchcancel', () => {
+      el.classList.remove('active');
+      if (!isToggle) state.keys[keyCode] = false;
+    });
+  }
+
+  // Attack button: maps to Space (slot 1) normally, Enter in inventory screen
+  btnAttack.addEventListener('touchstart', e => {
+    e.preventDefault();
+    btnAttack.classList.add('active');
+    if (state.inventoryScreenOpen) {
+      document.dispatchEvent(new KeyboardEvent('keydown', { code: 'Enter' }));
+    } else {
+      state.keys['Space'] = true;
+    }
+  }, { passive: false });
+  btnAttack.addEventListener('touchend', e => {
+    e.preventDefault();
+    btnAttack.classList.remove('active');
+    state.keys['Space'] = false;
+  });
+  btnAttack.addEventListener('touchcancel', () => {
+    btnAttack.classList.remove('active');
+    state.keys['Space'] = false;
+  });
+
+  bindActionBtn(btnSlot2, 'KeyX', false);
+  bindActionBtn(btnInv, 'KeyE', true);
+  bindActionBtn(btnDrop, 'KeyC', true);
+})();
+
+// ─── Start ────────────────────────────────────────────────────
+state = createState();
+loadRoom(state, 0);
+updateHUD();
+loop();
+showHome();
+drawCharPreview();
+</script>
+</body>
+</html>
