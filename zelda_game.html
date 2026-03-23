@@ -237,7 +237,9 @@
     display: grid;
     grid-template-columns: 56px 56px;
     gap: 10px;
+    justify-items: center;
   }
+  #btnPause { grid-column: 1 / -1; }
   .action-btn {
     width: 56px; height: 56px;
     background: rgba(255,255,255,0.12);
@@ -408,6 +410,7 @@
     <div class="action-btn" id="btnSlot2">🏹<span class="btn-label">SLT2</span></div>
     <div class="action-btn" id="btnInv">📦<span class="btn-label">INV</span></div>
     <div class="action-btn" id="btnDrop">🗑️<span class="btn-label">DROP</span></div>
+    <div class="action-btn" id="btnPause">⏸️<span class="btn-label">PAUSE</span></div>
   </div>
 </div>
 </div><!-- /gameOuter -->
@@ -3287,6 +3290,17 @@ function drawEnemyPreviews() {
   bindActionBtn(btnSlot2, 'KeyX', false);
   bindActionBtn(btnInv, 'KeyE', true);
   bindActionBtn(btnDrop, 'KeyC', true);
+
+  const btnPause = document.getElementById('btnPause');
+  btnPause.addEventListener('touchstart', function(e) {
+    e.preventDefault();
+    btnPause.classList.add('active');
+    document.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyP' }));
+  }, { passive: false });
+  btnPause.addEventListener('touchend', function(e) {
+    e.preventDefault();
+    btnPause.classList.remove('active');
+  }, { passive: false });
 })();
 
 // ─── Responsive Scaling ───────────────────────────────────────
