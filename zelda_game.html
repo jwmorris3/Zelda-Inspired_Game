@@ -57,16 +57,27 @@
     #inventoryBar {
       width: 100vw;
       max-width: 100%;
-      padding: 6px 6px;
+      padding: 4px 4px;
       gap: 0;
       flex-wrap: nowrap;
-      overflow-x: auto;
+      justify-content: center;
     }
-    .inv-slot { width: 48px; height: 48px; min-width: 48px; }
-    .inv-slots-row { gap: 4px; }
-    .inv-divider { margin: 0 6px; }
+    .inv-slot { width: 48px; height: 48px; min-width: 40px; flex-shrink: 1; }
+    .inv-slots-row { gap: 3px; }
+    .inv-divider { margin: 0 4px; }
     .inv-icon { font-size: 1.1rem !important; }
     .inv-name { font-size: 0.4rem !important; }
+  }
+  /* Smaller slots on very narrow screens (phones) */
+  @media (pointer: coarse) and (max-width: 480px) {
+    .inv-slot { width: 36px; height: 36px; min-width: 32px; }
+    .inv-slots-row { gap: 2px; }
+    .inv-divider { margin: 0 3px; }
+    .inv-section-title { font-size: 0.45rem !important; }
+    .inv-icon { font-size: 0.9rem !important; }
+    .inv-name { display: none !important; }
+    .inv-count { font-size: 0.5rem !important; }
+    .inv-key-label { font-size: 0.35rem !important; }
   }
   .inv-section { display: flex; flex-direction: column; align-items: center; }
   .inv-section-title {
@@ -265,8 +276,12 @@
     display: flex; flex-direction: column; align-items: center;
     transform-origin: top center;
     width: 640px;
+    margin: 0 auto;
   }
   #gameOuter {
+    display: flex; flex-direction: column; align-items: center; width: 100%;
+  }
+  #gameCenter {
     display: flex; flex-direction: column; align-items: center; width: 100%;
   }
   body { justify-content: flex-start; padding-top: 8px; overflow-x: hidden; }
@@ -3290,11 +3305,12 @@ function resizeGame() {
   const baseH = 486; // 480 + 6 for border
   const vw = window.innerWidth;
   const vh = window.innerHeight;
-  const isLandscape = vw > vh && 'ontouchstart' in window;
+  const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+  const isLandscape = vw > vh && isTouchDevice;
 
   if (isLandscape) {
     // Landscape: scale based on height, leave room for d-pad (left) + action btns (right)
-    const availH = vh - 60; // space for title + hud
+    const availH = vh - 50; // space for title + hud
     const availW = vw - 260; // ~130px each side for controls
     const scaleH = availH / baseH;
     const scaleW = availW / baseW;
@@ -3302,15 +3318,18 @@ function resizeGame() {
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
     wrap.style.height = (baseH * scale) + 'px';
+    wrap.style.width = baseW + 'px';
   } else if (vw < baseW) {
     // Portrait: scale based on width
     const scale = vw / baseW;
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
     wrap.style.height = (baseH * scale) + 'px';
+    wrap.style.width = baseW + 'px';
   } else {
     wrap.style.transform = '';
     wrap.style.height = '';
+    wrap.style.width = '';
   }
 }
 window.addEventListener('resize', resizeGame);
