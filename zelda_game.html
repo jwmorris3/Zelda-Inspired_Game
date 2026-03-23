@@ -3313,13 +3313,15 @@ function resizeGame() {
     invBar.style.height = (invBar.scrollHeight * invScale) + 'px';
   } else if (vw < baseW) {
     const scale = vw / baseW;
-    wrap.style.transform = 'scale(' + scale + ')';
-    wrap.style.transformOrigin = 'top center';
+    const offset = (vw - baseW) / 2;
+    wrap.style.transform = 'translateX(' + offset + 'px) scale(' + scale + ')';
+    wrap.style.transformOrigin = 'top left';
     wrap.style.height = (baseH * scale) + 'px';
     // Scale inventory bar to fit screen width
     const invScale = vw / invBaseW;
-    invBar.style.transform = 'scale(' + invScale + ')';
-    invBar.style.transformOrigin = 'top center';
+    const invOffset = (vw - invBaseW) / 2;
+    invBar.style.transform = 'translateX(' + invOffset + 'px) scale(' + invScale + ')';
+    invBar.style.transformOrigin = 'top left';
     invBar.style.height = (invBar.scrollHeight * invScale) + 'px';
   } else {
     wrap.style.transform = '';
