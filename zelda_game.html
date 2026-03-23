@@ -3317,12 +3317,13 @@ function resizeGame() {
     wrap.style.transformOrigin = 'top left';
     wrap.style.height = (baseH * scale) + 'px';
     wrap.style.marginLeft = ((vw - baseW * scale) / 2) + 'px';
-    // Scale inventory bar to fit screen width
-    const invScale = vw / invBaseW;
+    // Scale inventory bar to match canvas scale
+    const invScale = scale;
+    const scaledInvW = invBaseW * invScale;
     invBar.style.transform = 'scale(' + invScale + ')';
     invBar.style.transformOrigin = 'top left';
     invBar.style.height = (invBar.scrollHeight * invScale) + 'px';
-    invBar.style.marginLeft = ((vw - invBaseW * invScale) / 2) + 'px';
+    invBar.style.marginLeft = ((vw - scaledInvW) / 2) + 'px';
   } else {
     wrap.style.transform = '';
     wrap.style.height = '';
