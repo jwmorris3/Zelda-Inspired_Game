@@ -276,34 +276,43 @@
     #touchControls { max-width: 100vw; }
   }
 
-  /* Landscape on touch devices: controls beside game */
+  /* Landscape on touch devices: d-pad left, action buttons right */
   @media (pointer: coarse) and (orientation: landscape) {
-    #gameOuter { flex-direction: row; align-items: flex-start; justify-content: center; }
+    #gameOuter { flex-direction: column; align-items: center; justify-content: flex-start; }
     #gameCenter { display: flex; flex-direction: column; align-items: center; }
     h1 { font-size: 1rem; margin-bottom: 2px; }
     #hud { font-size: 0.7rem; gap: 6px; margin-bottom: 2px; }
     #inventoryBar { max-width: none; }
     #touchControls {
-      flex-direction: column;
-      width: auto !important;
-      max-width: none !important;
-      padding: 8px;
-      gap: 16px;
-      align-items: center;
-      justify-content: center;
-      min-height: 100vh;
-      position: fixed;
-      right: 0;
-      top: 0;
+      position: static;
+      width: 0 !important;
+      height: 0 !important;
+      padding: 0 !important;
+      overflow: visible;
     }
-    #dpad { width: 100px; height: 100px; }
-    #dpadUp    { top: 0;   left: 29px; width: 36px; height: 36px; font-size: 1rem; }
-    #dpadDown  { bottom: 0; left: 29px; width: 36px; height: 36px; font-size: 1rem; }
-    #dpadLeft  { top: 32px; left: 0; width: 36px; height: 36px; font-size: 1rem; }
-    #dpadRight { top: 32px; right: 0; width: 36px; height: 36px; font-size: 1rem; }
-    #dpadCenter { top: 32px; left: 29px; width: 36px; height: 36px; }
-    .action-btns { grid-template-columns: 48px 48px; gap: 8px; }
-    .action-btn { width: 48px; height: 48px; font-size: 1.1rem; }
+    #dpad {
+      position: fixed;
+      left: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 110px; height: 110px;
+      z-index: 100;
+    }
+    #dpadUp    { top: 0;   left: 34px; width: 38px; height: 38px; font-size: 1rem; }
+    #dpadDown  { bottom: 0; left: 34px; width: 38px; height: 38px; font-size: 1rem; }
+    #dpadLeft  { top: 36px; left: 0; width: 38px; height: 38px; font-size: 1rem; }
+    #dpadRight { top: 36px; right: 0; width: 38px; height: 38px; font-size: 1rem; }
+    #dpadCenter { top: 36px; left: 34px; width: 38px; height: 38px; }
+    .action-btns {
+      position: fixed;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      grid-template-columns: 50px 50px;
+      gap: 10px;
+      z-index: 100;
+    }
+    .action-btn { width: 50px; height: 50px; font-size: 1.1rem; }
   }
 </style>
 </head>
@@ -3284,9 +3293,9 @@ function resizeGame() {
   const isLandscape = vw > vh && 'ontouchstart' in window;
 
   if (isLandscape) {
-    // Landscape: scale based on height, leave room for HUD above
+    // Landscape: scale based on height, leave room for d-pad (left) + action btns (right)
     const availH = vh - 60; // space for title + hud
-    const availW = vw * 0.6; // leave room for touch controls on right
+    const availW = vw - 260; // ~130px each side for controls
     const scaleH = availH / baseH;
     const scaleW = availW / baseW;
     const scale = Math.min(scaleH, scaleW, 1);
