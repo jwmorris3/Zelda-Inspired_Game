@@ -178,13 +178,14 @@
   /* ─── Touch Controls ──────────────────────────────────── */
   #touchControls {
     display: none;
-    width: 100%; max-width: 640px;
-    padding: 12px 16px;
+    width: 100%;
+    padding: 16px 20px;
     justify-content: space-between;
     align-items: center;
     touch-action: none;
     user-select: none;
     -webkit-user-select: none;
+    box-sizing: border-box;
   }
   #dpad {
     width: 130px; height: 130px;
@@ -243,16 +244,17 @@
     #controls { display: none; }
   }
 
-  /* Scale game down on narrow screens */
+  /* Responsive layout */
   #gameWrap {
     display: flex; flex-direction: column; align-items: center;
-    transform-origin: top center;
+    transform-origin: top left;
+    width: 640px;
   }
-  @media (max-width: 660px) {
-    #gameWrap { transform: scale(calc(100vw / 660)); }
-    body { justify-content: flex-start; padding-top: 8px; }
+  body { justify-content: flex-start; padding-top: 8px; overflow-x: hidden; }
+  @media (pointer: coarse) {
     h1 { font-size: 1.3rem; margin-bottom: 4px; }
     #hud { font-size: 0.8rem; gap: 10px; }
+    #touchControls { max-width: 100vw; }
   }
 </style>
 </head>
@@ -3218,6 +3220,40 @@ function drawEnemyPreviews() {
   bindActionBtn(btnInv, 'KeyE', true);
   bindActionBtn(btnDrop, 'KeyC', true);
 })();
+
+// ─── Responsive Scaling ───────────────────────────────────────
+function resizeGame() {
+  const wrap = document.getElementById('gameWrap');
+  const touchCtrl = document.getElementById('touchControls');
+  const baseW = 640;
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  if (vw < baseW + 20) {
+    const scale = (vw - 8) / baseW;
+    wrap.style.transform = 'scale(' + scale + ')';
+    wrap.style.transformOrigin = 'top center';
+    wrap.style.marginLeft = 'auto';
+    wrap.style.marginRight = 'auto';
+    // Adjust body so content below gameWrap isn't hidden behind scaled gap
+    const wrapH = wrap.getBoundingClientRect().height;
+    wrap.style.marginBottom = -(wrap.offsetHeight - wrapH) + 'px';
+    // Scale touch controls to fill width
+    if (touchCtrl) {
+      touchCtrl.style.width = vw + 'px';
+      touchCtrl.style.maxWidth = vw + 'px';
+    }
+  } else {
+    wrap.style.transform = '';
+    wrap.style.marginBottom = '';
+    if (touchCtrl) {
+      touchCtrl.style.width = '';
+      touchCtrl.style.maxWidth = '';
+    }
+  }
+}
+window.addEventListener('resize', resizeGame);
+window.addEventListener('orientationchange', () => setTimeout(resizeGame, 100));
+resizeGame();
 
 // ─── Start ────────────────────────────────────────────────────
 state = createState();
