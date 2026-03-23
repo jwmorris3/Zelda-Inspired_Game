@@ -3051,9 +3051,19 @@ function loop() {
 }
 
 // ─── Home / Index screens ─────────────────────────────────────
+function hideTouchControls() {
+  document.getElementById('touchControls').style.display = 'none';
+}
+function showTouchControls() {
+  if ('ontouchstart' in window || navigator.maxTouchPoints > 0) {
+    document.getElementById('touchControls').style.display = 'flex';
+  }
+}
+
 function showHome() {
   state.paused = true;
   document.getElementById('homeScreen').style.display = 'flex';
+  hideTouchControls();
 }
 
 function startGame() {
@@ -3064,6 +3074,7 @@ function startGame() {
   state.transitionRoom = 0;
   state.keys = {};
   state.paused = false;
+  showTouchControls();
 }
 
 function showEnemyIndex() {
@@ -3071,6 +3082,7 @@ function showEnemyIndex() {
   document.getElementById('homeScreen').style.display = 'none';
   document.getElementById('enemyIndex').style.display = 'flex';
   drawEnemyPreviews();
+  hideTouchControls();
 }
 
 function closeEnemyIndex() {
