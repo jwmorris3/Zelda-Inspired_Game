@@ -3299,7 +3299,9 @@ function resizeGame() {
   const isLandscape = vw > vh && isTouchDevice;
 
   if (isLandscape) {
-    const availH = vh - 50;
+    // Reserve space for: title(~24px) + hud(~20px) + invBar(~70px) + padding(~16px)
+    const reservedH = 130;
+    const availH = vh - reservedH;
     const availW = vw - 260;
     const scaleH = availH / baseH;
     const scaleW = availW / baseW;
