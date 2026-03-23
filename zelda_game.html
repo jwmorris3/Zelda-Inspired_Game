@@ -55,29 +55,17 @@
   }
   @media (pointer: coarse) {
     #inventoryBar {
-      width: 100vw;
-      max-width: 100%;
-      padding: 4px 4px;
+      width: 640px;
+      transform-origin: top center;
+      padding: 4px 8px;
       gap: 0;
       flex-wrap: nowrap;
-      justify-content: center;
     }
-    .inv-slot { width: 48px; height: 48px; min-width: 40px; flex-shrink: 1; }
+    .inv-slot { width: 48px; height: 48px; min-width: 48px; }
     .inv-slots-row { gap: 3px; }
     .inv-divider { margin: 0 4px; }
     .inv-icon { font-size: 1.1rem !important; }
     .inv-name { font-size: 0.4rem !important; }
-  }
-  /* Smaller slots on very narrow screens (phones) */
-  @media (pointer: coarse) and (max-width: 480px) {
-    .inv-slot { width: 36px; height: 36px; min-width: 32px; }
-    .inv-slots-row { gap: 2px; }
-    .inv-divider { margin: 0 3px; }
-    .inv-section-title { font-size: 0.45rem !important; }
-    .inv-icon { font-size: 0.9rem !important; }
-    .inv-name { display: none !important; }
-    .inv-count { font-size: 0.5rem !important; }
-    .inv-key-label { font-size: 0.35rem !important; }
   }
   .inv-section { display: flex; flex-direction: column; align-items: center; }
   .inv-section-title {
@@ -284,7 +272,7 @@
   #gameCenter {
     display: flex; flex-direction: column; align-items: center; width: 100%;
   }
-  body { justify-content: flex-start; padding-top: 8px; overflow-x: hidden; }
+  body { justify-content: flex-start; padding-top: 4px; overflow-x: hidden; overflow-y: auto; min-height: auto; }
   @media (pointer: coarse) {
     h1 { font-size: 1.3rem; margin-bottom: 4px; }
     #hud { font-size: 0.8rem; gap: 10px; }
@@ -3301,35 +3289,43 @@ function drawEnemyPreviews() {
 // ─── Responsive Scaling ───────────────────────────────────────
 function resizeGame() {
   const wrap = document.getElementById('gameWrap');
+  const invBar = document.getElementById('inventoryBar');
   const baseW = 646; // 640 + 6 for border
   const baseH = 486; // 480 + 6 for border
+  const invBaseW = 640; // inventory bar native width
   const vw = window.innerWidth;
   const vh = window.innerHeight;
   const isTouchDevice = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
   const isLandscape = vw > vh && isTouchDevice;
 
   if (isLandscape) {
-    // Landscape: scale based on height, leave room for d-pad (left) + action btns (right)
-    const availH = vh - 50; // space for title + hud
-    const availW = vw - 260; // ~130px each side for controls
+    const availH = vh - 50;
+    const availW = vw - 260;
     const scaleH = availH / baseH;
     const scaleW = availW / baseW;
     const scale = Math.min(scaleH, scaleW, 1);
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
     wrap.style.height = (baseH * scale) + 'px';
-    wrap.style.width = baseW + 'px';
+    // Scale inventory bar to match
+    const invScale = Math.min(availW / invBaseW, scale);
+    invBar.style.transform = 'scale(' + invScale + ')';
+    invBar.style.height = (invBar.scrollHeight * invScale) + 'px';
   } else if (vw < baseW) {
-    // Portrait: scale based on width
     const scale = vw / baseW;
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
     wrap.style.height = (baseH * scale) + 'px';
-    wrap.style.width = baseW + 'px';
+    // Scale inventory bar to fit screen width
+    const invScale = vw / invBaseW;
+    invBar.style.transform = 'scale(' + invScale + ')';
+    invBar.style.transformOrigin = 'top center';
+    invBar.style.height = (invBar.scrollHeight * invScale) + 'px';
   } else {
     wrap.style.transform = '';
     wrap.style.height = '';
-    wrap.style.width = '';
+    invBar.style.transform = '';
+    invBar.style.height = '';
   }
 }
 window.addEventListener('resize', resizeGame);
