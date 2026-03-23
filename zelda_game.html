@@ -263,8 +263,11 @@
   /* Responsive layout */
   #gameWrap {
     display: flex; flex-direction: column; align-items: center;
-    transform-origin: top left;
+    transform-origin: top center;
     width: 640px;
+  }
+  #gameOuter {
+    display: flex; flex-direction: column; align-items: center; width: 100%;
   }
   body { justify-content: flex-start; padding-top: 8px; overflow-x: hidden; }
   @media (pointer: coarse) {
@@ -272,9 +275,41 @@
     #hud { font-size: 0.8rem; gap: 10px; }
     #touchControls { max-width: 100vw; }
   }
+
+  /* Landscape on touch devices: controls beside game */
+  @media (pointer: coarse) and (orientation: landscape) {
+    #gameOuter { flex-direction: row; align-items: flex-start; justify-content: center; }
+    #gameCenter { display: flex; flex-direction: column; align-items: center; }
+    h1 { font-size: 1rem; margin-bottom: 2px; }
+    #hud { font-size: 0.7rem; gap: 6px; margin-bottom: 2px; }
+    #inventoryBar { max-width: none; }
+    #touchControls {
+      flex-direction: column;
+      width: auto !important;
+      max-width: none !important;
+      padding: 8px;
+      gap: 16px;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      position: fixed;
+      right: 0;
+      top: 0;
+    }
+    #dpad { width: 100px; height: 100px; }
+    #dpadUp    { top: 0;   left: 29px; width: 36px; height: 36px; font-size: 1rem; }
+    #dpadDown  { bottom: 0; left: 29px; width: 36px; height: 36px; font-size: 1rem; }
+    #dpadLeft  { top: 32px; left: 0; width: 36px; height: 36px; font-size: 1rem; }
+    #dpadRight { top: 32px; right: 0; width: 36px; height: 36px; font-size: 1rem; }
+    #dpadCenter { top: 32px; left: 29px; width: 36px; height: 36px; }
+    .action-btns { grid-template-columns: 48px 48px; gap: 8px; }
+    .action-btn { width: 48px; height: 48px; font-size: 1.1rem; }
+  }
 </style>
 </head>
 <body>
+<div id="gameOuter">
+<div id="gameCenter">
 <h1>⚔️ ZELDA ADVENTURE</h1>
 <div id="hud">
   <span>❤️ <span class="hearts" id="heartsDisplay"></span></span>
@@ -342,6 +377,7 @@
 <div id="controls">
   WASD — Move &nbsp;|&nbsp; Z/Space — use slot 1 &nbsp;|&nbsp; X — use slot 2 &nbsp;|&nbsp; ← → move inventory cursor &nbsp;|&nbsp; ↑ select/swap &nbsp;|&nbsp; ↓ cancel &nbsp;|&nbsp; E — Full Inventory &nbsp;|&nbsp; C — Drop Item
 </div>
+</div><!-- /gameCenter -->
 
 <!-- Touch Controls (visible on touch devices only) -->
 <div id="touchControls">
@@ -359,6 +395,7 @@
     <div class="action-btn" id="btnDrop">🗑️<span class="btn-label">DROP</span></div>
   </div>
 </div>
+</div><!-- /gameOuter -->
 
 <!-- Home Screen -->
 <div id="homeScreen">
@@ -3240,16 +3277,28 @@ function drawEnemyPreviews() {
 // ─── Responsive Scaling ───────────────────────────────────────
 function resizeGame() {
   const wrap = document.getElementById('gameWrap');
-  const canvas = document.getElementById('gameCanvas');
   const baseW = 646; // 640 + 6 for border
+  const baseH = 486; // 480 + 6 for border
   const vw = window.innerWidth;
-  if (vw < baseW) {
+  const vh = window.innerHeight;
+  const isLandscape = vw > vh && 'ontouchstart' in window;
+
+  if (isLandscape) {
+    // Landscape: scale based on height, leave room for HUD above
+    const availH = vh - 60; // space for title + hud
+    const availW = vw * 0.6; // leave room for touch controls on right
+    const scaleH = availH / baseH;
+    const scaleW = availW / baseW;
+    const scale = Math.min(scaleH, scaleW, 1);
+    wrap.style.transform = 'scale(' + scale + ')';
+    wrap.style.transformOrigin = 'top center';
+    wrap.style.height = (baseH * scale) + 'px';
+  } else if (vw < baseW) {
+    // Portrait: scale based on width
     const scale = vw / baseW;
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
-    // Collapse the extra space from scaling
-    const realH = canvas.offsetHeight * scale;
-    wrap.style.height = realH + 'px';
+    wrap.style.height = (baseH * scale) + 'px';
   } else {
     wrap.style.transform = '';
     wrap.style.height = '';
