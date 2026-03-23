@@ -51,6 +51,22 @@
     border-top: none;
     padding: 8px 14px;
     gap: 0;
+    box-sizing: border-box;
+  }
+  @media (pointer: coarse) {
+    #inventoryBar {
+      width: 100vw;
+      max-width: 100%;
+      padding: 6px 6px;
+      gap: 0;
+      flex-wrap: nowrap;
+      overflow-x: auto;
+    }
+    .inv-slot { width: 48px; height: 48px; min-width: 48px; }
+    .inv-slots-row { gap: 4px; }
+    .inv-divider { margin: 0 6px; }
+    .inv-icon { font-size: 1.1rem !important; }
+    .inv-name { font-size: 0.4rem !important; }
   }
   .inv-section { display: flex; flex-direction: column; align-items: center; }
   .inv-section-title {
@@ -266,6 +282,7 @@
 </div>
 <div id="gameWrap">
 <canvas id="gameCanvas" width="640" height="480"></canvas>
+</div>
 <div id="inventoryBar">
   <div class="inv-section">
     <div class="inv-section-title">Equipped</div>
@@ -325,7 +342,6 @@
 <div id="controls">
   WASD — Move &nbsp;|&nbsp; Z/Space — use slot 1 &nbsp;|&nbsp; X — use slot 2 &nbsp;|&nbsp; ← → move inventory cursor &nbsp;|&nbsp; ↑ select/swap &nbsp;|&nbsp; ↓ cancel &nbsp;|&nbsp; E — Full Inventory &nbsp;|&nbsp; C — Drop Item
 </div>
-</div><!-- /gameWrap -->
 
 <!-- Touch Controls (visible on touch devices only) -->
 <div id="touchControls">
@@ -3224,31 +3240,19 @@ function drawEnemyPreviews() {
 // ─── Responsive Scaling ───────────────────────────────────────
 function resizeGame() {
   const wrap = document.getElementById('gameWrap');
-  const touchCtrl = document.getElementById('touchControls');
-  const baseW = 640;
+  const canvas = document.getElementById('gameCanvas');
+  const baseW = 646; // 640 + 6 for border
   const vw = window.innerWidth;
-  const vh = window.innerHeight;
-  if (vw < baseW + 20) {
-    const scale = (vw - 8) / baseW;
+  if (vw < baseW) {
+    const scale = vw / baseW;
     wrap.style.transform = 'scale(' + scale + ')';
     wrap.style.transformOrigin = 'top center';
-    wrap.style.marginLeft = 'auto';
-    wrap.style.marginRight = 'auto';
-    // Adjust body so content below gameWrap isn't hidden behind scaled gap
-    const wrapH = wrap.getBoundingClientRect().height;
-    wrap.style.marginBottom = -(wrap.offsetHeight - wrapH) + 'px';
-    // Scale touch controls to fill width
-    if (touchCtrl) {
-      touchCtrl.style.width = vw + 'px';
-      touchCtrl.style.maxWidth = vw + 'px';
-    }
+    // Collapse the extra space from scaling
+    const realH = canvas.offsetHeight * scale;
+    wrap.style.height = realH + 'px';
   } else {
     wrap.style.transform = '';
-    wrap.style.marginBottom = '';
-    if (touchCtrl) {
-      touchCtrl.style.width = '';
-      touchCtrl.style.maxWidth = '';
-    }
+    wrap.style.height = '';
   }
 }
 window.addEventListener('resize', resizeGame);
